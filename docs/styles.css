@@ -132,6 +132,17 @@ button.ghost.danger:hover { background: color-mix(in srgb, var(--danger) 10%, tr
 #loginForm { display: flex; flex-direction: column; gap: 12px; max-width: 320px; margin: 8px auto 0; }
 #loginForm .row { justify-content: center; }
 .login-name { text-transform: capitalize; font-weight: 700; margin: 0; }
+.guest-btn { border: 1px dashed var(--border); background: transparent; color: var(--brand); }
+.guest-btn:hover { background: var(--brand-soft); }
+
+/* ---- guest mode ---- */
+.guest-banner {
+    margin: 12px 0 0; padding: 10px 14px; border-radius: 10px;
+    background: var(--brand-soft); color: var(--text);
+    font-size: 0.85rem; text-align: center;
+}
+.guest-quota { min-height: 1.1em; margin: 6px 0 0; color: var(--brand); font-size: 0.8rem; font-weight: 600; }
+#guestProfileNote { margin: 8px 0 4px; }
 
 /* ---- date nav ---- */
 #dateNav {
@@ -174,6 +185,11 @@ button.ghost.danger:hover { background: color-mix(in srgb, var(--danger) 10%, tr
 }
 .bar-fill.over { background: linear-gradient(90deg, var(--danger), #e0745a); }
 .bar-fill.good { background: linear-gradient(90deg, #2e9e5b, #46c072); }
+/* spill: over this macro's grams, but compensated by the partner (carbs<->fat) — not a real overage */
+.bar-fill.spill { background: linear-gradient(90deg, #d98a1f, #e6a84a); }
+.bar-spill { margin-top: 4px; font-size: 0.72rem; font-weight: 600; color: #b9791b; }
+:root[data-theme="dark"] .bar-spill, html[data-theme="dark"] .bar-spill { color: #e6a84a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .bar-spill { color: #e6a84a; } }
 
 /* group divider between macro and micronutrient bars */
 .bar-group-label {

@@ -46,6 +46,11 @@
 
     <!-- App -->
     <main id="appSection" hidden>
+        <!-- Guest mode notice — local-only, throttled AI lookups, not synced -->
+        <p id="guestBanner" class="guest-banner" hidden>
+            👋 You're exploring as a <strong>Guest</strong> — data stays on this device and isn't synced. AI lookups are throttled.
+        </p>
+
         <!-- TODAY -->
         <section id="tab-today" class="tab-panel">
             <div id="dateNav">
@@ -74,6 +79,7 @@
                     <button type="submit" id="addButton">Add</button>
                 </form>
                 <p id="status" class="status" role="status" aria-live="polite"></p>
+                <p id="guestQuota" class="guest-quota" role="status" aria-live="polite" hidden></p>
                 <div id="favorites">
                     <h3>Favorites</h3>
                     <div id="favoriteMenu"></div>
@@ -184,6 +190,10 @@
             <div class="card">
                 <h2>Profile</h2>
                 <p class="muted">Signed in as <strong id="profileName"></strong></p>
+                <div id="guestProfileNote" hidden>
+                    <p class="muted">You're in guest mode. Pick a profile below and enter its access key to sign in and sync across devices, or exit guest mode to clear this device's test data.</p>
+                    <button type="button" id="leaveGuestBtn" class="ghost danger">Exit guest mode</button>
+                </div>
                 <h3>Switch profile</h3>
                 <div id="switchList" class="row wrap"></div>
             </div>

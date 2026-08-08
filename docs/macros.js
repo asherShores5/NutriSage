@@ -101,6 +101,65 @@ function pct(value, goal) {
     return Math.max(0, Math.min(100, Math.round((num(value) / goal) * 100)));
 }
 
+// ---- bar coloring -----------------------------------------------------------
+// Independent-goal color intent (green = on target). Protein/fiber: green once at/over
+// goal (more is fine). Others: green within ±10% of goal, red when >10% over. Under-target
+// stays neutral. Carbs/fat DON'T use this directly — they go through energyBalance (below),
+// which treats them as one shared caloric pool.
+const MORE_IS_GOOD = new Set(['protein', 'fiber']);
+function barState(key, value, goal) {
+    if (goal <= 0) return '';
+    const v = num(value);
+    if (MORE_IS_GOOD.has(key)) return v >= goal * 0.9 ? 'good' : '';
+    if (v >= goal * 0.9 && v <= goal * 1.1) return 'good';
+    if (v > goal * 1.1) return 'over';
+    return '';
+}
+
+// Carbs and fat are interchangeable energy: 4 cal/g and 9 cal/g. Being over one while
+// under the other by the same calories is a SWAP, not an overage — so we judge them as a
+// single caloric pool instead of two independent limits.
+const CAL_PER_G = { carbs: 4, fat: 9 };
+
+// Returns { carbs:{state, spillCal, partner}, fat:{...} }. State is:
+//   'over'  — the COMBINED carb+fat calories exceed the combined goal by >10% (real overage);
+//             the individual macro(s) that are over their own grams get flagged.
+//   'spill' — this macro is over its own grams, but the pool is still on target because the
+//             partner is under: it borrowed spillCal calories from the partner (not bad).
+//   'good'  — the pool is balanced (±10%), so this macro is fine even if individually under.
+//   ''      — under target with no borrowing, or a goal is unset (falls back to independent).
+function energyBalance(totals, goals) {
+    const g = goals || {}, t = totals || {};
+    const cGoal = num(g.carbs), fGoal = num(g.fat);
+    const cVal = num(t.carbs), fVal = num(t.fat);
+    const out = {
+        carbs: { state: barState('carbs', cVal, cGoal), spillCal: 0, partner: 'fat' },
+        fat: { state: barState('fat', fVal, fGoal), spillCal: 0, partner: 'carbs' },
+    };
+    // Need both goals set to treat them as a shared pool; otherwise keep the independent states.
+    if (cGoal <= 0 || fGoal <= 0) return out;
+
+    const poolGoal = cGoal * CAL_PER_G.carbs + fGoal * CAL_PER_G.fat;
+    const poolVal = cVal * CAL_PER_G.carbs + fVal * CAL_PER_G.fat;
+    const poolOver = poolVal > poolGoal * 1.1;
+    const poolGood = poolVal >= poolGoal * 0.9 && poolVal <= poolGoal * 1.1;
+
+    [['carbs', cVal, cGoal], ['fat', fVal, fGoal]].forEach(([key, val, goal]) => {
+        const overGrams = val - goal;
+        if (overGrams > goal * 0.1) {                 // individually over its own grams (>10%)
+            if (poolOver) {
+                out[key].state = 'over';              // pool genuinely over -> a real overage
+            } else {
+                out[key].state = 'spill';             // compensated by the partner's headroom
+                out[key].spillCal = Math.round(overGrams * CAL_PER_G[key]);
+            }
+        } else if (poolGood) {
+            out[key].state = 'good';                  // pool balanced -> this macro is fine even if under
+        }
+    });
+    return out;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { num, sumMacros, dateKey, weekKeys, lastDays, sumWeek, scaleMacros, portionLabel, parsePortion, adjustEntry, weekStats, streak, pct, MACRO_KEYS };
+    module.exports = { num, sumMacros, dateKey, weekKeys, lastDays, sumWeek, scaleMacros, portionLabel, parsePortion, adjustEntry, weekStats, streak, pct, MACRO_KEYS, MORE_IS_GOOD, barState, energyBalance, CAL_PER_G };
 }

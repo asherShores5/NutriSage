@@ -1,6 +1,6 @@
 // Run with: node docs/macros.test.js
 const assert = require('assert');
-const { num, sumMacros, dateKey, weekKeys, lastDays, sumWeek, scaleMacros, portionLabel, parsePortion, adjustEntry, weekStats, streak, pct } = require('./macros.js');
+const { num, sumMacros, dateKey, weekKeys, lastDays, sumWeek, scaleMacros, portionLabel, parsePortion, adjustEntry, weekStats, streak, pct, barState, energyBalance } = require('./macros.js');
 
 // num() coerces junk to 0, keeps real numbers
 assert.strictEqual(num('12'), 12);
@@ -95,5 +95,57 @@ assert.strictEqual(streak(strk, '2026-03-03'), 3);
 assert.strictEqual(streak(strk, '2026-03-04'), 3); // unlogged "today" doesn't break it (grace)
 assert.strictEqual(streak(strk, '2026-03-05'), 0); // missed a full day -> broken
 assert.strictEqual(streak({ '2026-03-02': { entries: [] } }, '2026-03-02'), 0); // empty entries != logged
+
+// barState() — independent-goal coloring
+assert.strictEqual(barState('sodium', 100, 0), '');            // no goal -> neutral
+assert.strictEqual(barState('sodium', 100, 100), 'good');      // on target
+assert.strictEqual(barState('sodium', 130, 100), 'over');      // >10% over -> red
+assert.strictEqual(barState('sodium', 80, 100), '');           // under -> neutral
+assert.strictEqual(barState('protein', 95, 100), 'good');      // more-is-good: green at 90%+
+assert.strictEqual(barState('protein', 200, 100), 'good');     // more-is-good: never 'over'
+assert.strictEqual(barState('fiber', 50, 100), '');            // more-is-good but well under -> neutral
+
+// energyBalance() — carbs+fat as one caloric pool (carbs 4 cal/g, fat 9 cal/g)
+// Goals: carbs 200g (800 cal), fat 60g (540 cal) -> pool goal 1340 cal.
+
+// Both on target -> both 'good', no spill.
+let eb = energyBalance({ carbs: 200, fat: 60 }, { carbs: 200, fat: 60 });
+assert.strictEqual(eb.carbs.state, 'good');
+assert.strictEqual(eb.fat.state, 'good');
+assert.strictEqual(eb.fat.spillCal, 0);
+
+// The user's case: over fat, under carbs by the SAME calories -> pool balanced, no red.
+// fat 80g = 720 cal (+180 over the 540 goal); carbs 155g = 620 cal (-180 under the 800 goal).
+// pool = 1340 cal, exactly the goal -> fat is a 'spill' (180 cal), carbs 'good'.
+eb = energyBalance({ carbs: 155, fat: 80 }, { carbs: 200, fat: 60 });
+assert.strictEqual(eb.fat.state, 'spill');
+assert.strictEqual(eb.fat.spillCal, 180);         // (80-60)*9
+assert.strictEqual(eb.carbs.state, 'good');       // under its grams, but pool balanced -> fine
+assert.strictEqual(eb.carbs.spillCal, 0);
+
+// Genuinely over the pool (over fat, carbs NOT compensating) -> real overage, red.
+// fat 90g = 810 cal, carbs 200g = 800 cal -> pool 1610 > 1340*1.1 (1474) -> pool over.
+eb = energyBalance({ carbs: 200, fat: 90 }, { carbs: 200, fat: 60 });
+assert.strictEqual(eb.fat.state, 'over');          // fat is over its grams AND the pool is over -> red
+assert.strictEqual(eb.carbs.state, 'good');        // carbs exactly at goal (not >10% over) -> not flagged
+
+// Both over their grams and the pool is over -> both red.
+// carbs 260g = 1040 cal, fat 80g = 720 cal -> pool 1760 > 1474 -> both 'over'.
+eb = energyBalance({ carbs: 260, fat: 80 }, { carbs: 200, fat: 60 });
+assert.strictEqual(eb.carbs.state, 'over');
+assert.strictEqual(eb.fat.state, 'over');
+
+// Over on carbs, under on fat, pool balanced -> carbs 'spill', fat 'good' (symmetric case).
+// carbs 245g = 980 cal (+180); fat 40g = 360 cal (-180) -> pool 1340 -> balanced.
+eb = energyBalance({ carbs: 245, fat: 40 }, { carbs: 200, fat: 60 });
+assert.strictEqual(eb.carbs.state, 'spill');
+assert.strictEqual(eb.carbs.spillCal, 180);       // (245-200)*4
+assert.strictEqual(eb.fat.state, 'good');
+
+// Missing a goal -> fall back to independent barState (no pooling).
+eb = energyBalance({ carbs: 300, fat: 80 }, { carbs: 0, fat: 60 });
+assert.strictEqual(eb.fat.state, 'over');         // 80 > 60*1.1, judged independently
+assert.strictEqual(eb.carbs.state, '');           // no carbs goal -> neutral
+assert.strictEqual(eb.fat.spillCal, 0);
 
 console.log('macros.test.js: all assertions passed');
