@@ -76,7 +76,7 @@ await c.check("logging today extends the streak and the averages", async () => {
   await expect(value(total, "calories")).toHaveText("9500 / 14000 cal");
 });
 
-await c.check("Trends charts calories over the last 30 Days, one dot per Day above 0", async () => {
+await c.check("Trends charts calories over the last 30 Days, one dot per logged Day", async () => {
   await tab(p, "Trends");
   const chart = p.getByRole("img", { name: "Calories, last 30 days" });
   await expect(chart).toBeVisible();
@@ -91,7 +91,7 @@ await c.check("Trends switches metric; weight shows only the Days it was logged"
   await expect(chart.locator(".trend-dot")).toHaveCount(2);
   await expect(p.getByText("Last 30 days · 2 logged · max 171")).toBeVisible();
   await p.getByLabel("Metric").selectOption("water");
-  await expect(p.getByRole("img", { name: "Water, last 30 days" }).locator(".trend-dot")).toHaveCount(6); // 3 cups on the 5 seeded Days, 6 cups 4 Days ago
+  await expect(p.getByRole("img", { name: "Water, last 30 days" }).locator(".trend-dot")).toHaveCount(7); // 3 cups on the 5 seeded Days, 6 cups 4 Days ago, 0 today (logged, so a real 0)
 });
 
 await p.context().close();
