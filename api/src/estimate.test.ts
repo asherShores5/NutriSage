@@ -16,6 +16,12 @@ describe("estimate (a Member types a Food and Bedrock estimates it)", () => {
     expect(h.bedrock.calls[0].modelId).toBe("test-model");
   });
 
+  it("leaves temperature at the model's default (Sonnet 4.6 on Converse)", async () => {
+    h.bedrock.reply(JSON.stringify(EGGS));
+    await h.call(h.A, "estimate", { text: "apple" });
+    expect(h.bedrock.calls[0].inferenceConfig).toEqual({ maxTokens: 300 });
+  });
+
   it("returns other units Bedrock suggests with their gram weights, dropping junk ones", async () => {
     h.bedrock.reply(JSON.stringify({ ...EGGS, servingGrams: 122, units: { Egg: 61, cup: "240 g", serving: 5, g: 2, "": 4, slice: -3, scoop: "lots" } }));
     const r = await h.call(h.A, "estimate", { text: "2 eggs scrambled" });

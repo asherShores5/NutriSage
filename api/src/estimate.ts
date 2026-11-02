@@ -147,7 +147,7 @@ export async function estimateFood(text: unknown, opts: EstimateOptions = {}): P
         modelId,
         system: [{ text: SYSTEM + (opts.ingredient ? YIELD : "") }],
         messages: [{ role: "user", content: [{ text: `<food>${name}</food>` }] }],
-        inferenceConfig: { maxTokens: 300, temperature: 0 },
+        inferenceConfig: { maxTokens: 300 },
       }),
     );
   } catch (e) {
