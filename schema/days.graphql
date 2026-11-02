@@ -16,6 +16,10 @@ type Entry {
   nutrition: Nutrition!
   "Gram weight of what was logged, when known."
   grams: Float
+  "How much was logged, in unit (> 0, <= 100; <= 5000 in g). Null on migrated Entries (1 serving)."
+  amount: Float
+  "serving, g or a Food's own unit. Null on migrated Entries."
+  unit: String
 }
 
 input EntryInput {
@@ -24,6 +28,8 @@ input EntryInput {
   name: String!
   nutrition: NutritionInput!
   grams: Float
+  amount: Float
+  unit: String
 }
 
 type Day {

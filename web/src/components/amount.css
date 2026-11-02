@@ -1,0 +1,6 @@
+/* AmountPicker: amount box + unit picker, then quick amounts. */
+.amount-picker { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.amount-picker .amount-input { width: 5.5rem; font-variant-numeric: tabular-nums; }
+.quick-amounts { display: flex; gap: 0.35rem; }
+.quick-amounts button { height: var(--control); min-width: 2.6rem; padding: 0 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-variant-numeric: tabular-nums; }
+.quick-amounts button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }

@@ -1,12 +1,17 @@
 // The Entry form's rules (estimated or hand-typed), kept pure so they're testable without a DOM.
-import { NUTRIENTS, type Entry, type Meal, type NutrientKey, type Nutrition } from "@nutrisage/shared";
+import {
+  NUTRIENTS, SERVING, parseAmount, scaleSnapshot, servingUnits,
+  type Amount, type Entry, type Meal, type NutrientKey, type Nutrition,
+} from "@nutrisage/shared";
 import type { Estimate } from "../../api/estimate";
 
 export interface EntryFormValues {
   name: string;
   meal: Meal;
-  /** What's typed in each nutrient box. */
+  /** What's typed in each nutrient box: nutrition for 1 serving. */
   values: Record<NutrientKey, string>;
+  /** The typed amount of servings ("1 1/2"). */
+  amount: string;
 }
 
 export type EntryFormResult = { ok: true; entry: Omit<Entry, "id"> } | { ok: false; error: string };
@@ -14,7 +19,8 @@ export type EntryFormResult = { ok: true; entry: Omit<Entry, "id"> } | { ok: fal
 export const blankNutrientValues = (): Record<NutrientKey, string> =>
   Object.fromEntries(NUTRIENTS.map((n) => [n.key, ""])) as Record<NutrientKey, string>;
 
-export function readEntryForm({ name, meal, values }: EntryFormValues): EntryFormResult {
+/** A hand-typed Entry: the typed nutrition is 1 serving, multiplied by the amount. */
+export function readEntryForm({ name, meal, values, amount }: EntryFormValues): EntryFormResult {
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Give the Entry a name" };
   const nutrition = {} as Nutrition;
@@ -24,10 +30,17 @@ export function readEntryForm({ name, meal, values }: EntryFormValues): EntryFor
     if (!Number.isFinite(v) || v < 0) return { ok: false, error: `${n.label} must be a number, 0 or more` };
     nutrition[n.key] = v;
   }
-  return { ok: true, entry: { meal, name: trimmed, nutrition } };
+  const a = parseAmount(amount, SERVING);
+  if (!a.ok) return a;
+  const one = { amount: 1, unit: SERVING };
+  const r = scaleSnapshot({ nutrition }, one, { amount: a.amount, unit: SERVING }, servingUnits(null));
+  if (!r.ok) return r;
+  return { ok: true, entry: { meal, name: trimmed, amount: a.amount, unit: SERVING, nutrition: r.nutrition } };
 }
 
-/** The Entry for one estimated serving: Bedrock's nutrition snapshot plus its gram weight when known. */
-export function entryFromEstimate(est: Estimate, meal: Meal): Omit<Entry, "id"> {
-  return { meal, name: est.name, nutrition: est.nutrition, ...(est.servingGrams ? { grams: est.servingGrams } : {}) };
+/** The Entry for `to` of an estimated serving: Bedrock's nutrition scaled, plus grams when known. */
+export function entryFromEstimate(est: Estimate, meal: Meal, to: Amount): EntryFormResult {
+  const r = scaleSnapshot({ nutrition: est.nutrition, grams: est.servingGrams }, { amount: 1, unit: SERVING }, to, servingUnits(est.servingGrams));
+  if (!r.ok) return r;
+  return { ok: true, entry: { meal, name: est.name, amount: to.amount, unit: to.unit, nutrition: r.nutrition, ...(r.grams ? { grams: r.grams } : {}) } };
 }

@@ -1,12 +1,12 @@
 // Days: a Member reads and writes only their own (spec: API contract). Schema: schema/days.graphql.
 import { QueryCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { MEALS, NUTRIENT_KEYS, isDateKey, type Day, type Entry, type Nutrition } from "@nutrisage/shared";
+import { MEALS, NUTRIENT_KEYS, amountMax, isAmount, isDateKey, type Day, type Entry, type Nutrition } from "@nutrisage/shared";
 import { invalid } from "../errors";
 import { TABLE, dayKey, ddb, memberPk, strip } from "../table";
 import type { ResolverModule } from "./types";
 
 /** Record caps against a scripted flood, generous enough that real logging never meets them. */
-export const DAY_LIMITS = { entries: 200, nameLength: 120, nutrient: 100_000, water: 100, weight: 2_000, grams: 100_000 } as const;
+export const DAY_LIMITS = { entries: 200, nameLength: 120, nutrient: 100_000, water: 100, weight: 2_000, grams: 100_000, unitLength: 30 } as const;
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 function finiteIn(v: unknown, max: number, what: string): number {
@@ -31,7 +31,17 @@ function validateEntry(e: unknown): Entry {
   const name = typeof src.name === "string" ? src.name.trim() : "";
   if (!name || name.length > DAY_LIMITS.nameLength) throw invalid(`Entry name must be 1-${DAY_LIMITS.nameLength} characters`);
   const grams = optionalIn(src.grams, DAY_LIMITS.grams, "grams");
-  return { id: src.id, meal: src.meal as Entry["meal"], name, nutrition: validateNutrition(src.nutrition), ...(grams === null ? {} : { grams }) };
+  return { id: src.id, meal: src.meal as Entry["meal"], name, nutrition: validateNutrition(src.nutrition), ...(grams === null ? {} : { grams }), ...validateAmount(src) };
+}
+
+/** Amount and unit come together, or neither (a migrated Entry, which counts as 1 serving). */
+function validateAmount(src: Record<string, unknown>): Pick<Entry, "amount" | "unit"> {
+  const none = (v: unknown) => v === null || v === undefined;
+  if (none(src.amount) && none(src.unit)) return {};
+  const unit = typeof src.unit === "string" ? src.unit.trim() : "";
+  if (!unit || unit.length > DAY_LIMITS.unitLength) throw invalid(`unit must be 1-${DAY_LIMITS.unitLength} characters, with an amount`);
+  if (!isAmount(src.amount, unit)) throw invalid(`amount must be more than 0 and at most ${amountMax(unit)}`);
+  return { amount: src.amount, unit };
 }
 
 /** Whole cups, or null for none logged. */
