@@ -1,15 +1,21 @@
 import { useState } from "react";
-import { entryAmount, entryUnits, formatAmount, parseAmount, rescaleEntry, type Entry } from "@nutrisage/shared";
+import {
+  MEALS, MEAL_LABELS, entryAmount, entryUnits, formatAmount, isDateKey, parseAmount, rescaleEntry,
+  type Entry, type Meal,
+} from "@nutrisage/shared";
 import { AmountPicker } from "../../components/AmountPicker";
 
 /**
  * Edit one Entry, opened from the Entry list. Ticket 04: delete. Ticket 05: amount and unit, which
  * rescale the snapshot as you type; bad input shows a message and leaves the Entry as it was.
- * Moving to another Meal or Day (06) adds its controls here and saves through `onChange`.
+ * Ticket 06: the Meal and Day pickers move it (amount and nutrition snapshot stay as they are).
  */
-export function EntryEditor({ entry, onChange, onDelete, onClose }: {
+export function EntryEditor({ entry, date, onChange, onMoveToDay, onDelete, onClose }: {
   entry: Entry;
+  /** The Day the Entry is on (YYYY-MM-DD). */
+  date: string;
   onChange: (entry: Entry) => void;
+  onMoveToDay: (date: string) => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
@@ -42,6 +48,18 @@ export function EntryEditor({ entry, onChange, onDelete, onClose }: {
     <div className="entry-editor" role="group" aria-label={`Edit ${entry.name}`}>
       <AmountPicker amount={text} unit={current.unit} units={units.map((u) => u.label)} onAmount={(t) => apply(t, current.unit)} onUnit={switchUnit} />
       {error && <p className="error" role="alert">{error}</p>}
+      <div className="entry-move">
+        <label>
+          <span>Meal</span>
+          <select aria-label="Meal" value={entry.meal} onChange={(e) => onChange({ ...entry, meal: e.target.value as Meal })}>
+            {MEALS.map((m) => <option key={m} value={m}>{MEAL_LABELS[m]}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>Day</span>
+          <input type="date" aria-label="Day" value={date} onChange={(e) => isDateKey(e.target.value) && e.target.value !== date && onMoveToDay(e.target.value)} />
+        </label>
+      </div>
       <div className="entry-editor-actions">
         <button type="button" className="danger" onClick={onDelete}>Delete</button>
         <button type="button" onClick={onClose}>Done</button>

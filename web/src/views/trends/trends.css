@@ -1,0 +1,8 @@
+/* Trends tab. The chart scales to the card width (viewBox), colored from the theme variables. */
+.trends .card-head { align-items: center; gap: 0.75rem; }
+.trend-card { justify-items: stretch; }
+.trend-chart { width: 100%; height: auto; display: block; }
+.trend-axis { stroke: var(--border); stroke-width: 1; }
+.trend-line { fill: none; stroke: var(--bar); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.trend-dot { fill: var(--bar); }
+.trend-label { fill: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }

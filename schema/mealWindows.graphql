@@ -1,0 +1,28 @@
+# Meal windows (ticket 07). Resolvers: api/src/resolvers/mealWindows.ts.
+
+"The start time (HH:MM, 24-hour, device-local) of each Meal's window. A window runs until the next Meal starts."
+type MealWindows {
+  breakfast: String!
+  lunch: String!
+  dinner: String!
+  dessert: String!
+  snack: String!
+}
+
+input MealWindowsInput {
+  breakfast: String!
+  lunch: String!
+  dinner: String!
+  dessert: String!
+  snack: String!
+}
+
+extend type Query {
+  "The caller's Meal windows (defaults until set: Breakfast before 10:30, Lunch 10:30-14:30, Snack 14:30-17:00, Dinner 17:00-20:30, Dessert from 20:30)."
+  mealWindows: MealWindows!
+}
+
+extend type Mutation {
+  "Replace the caller's Meal windows."
+  putMealWindows(input: MealWindowsInput!): MealWindows!
+}
