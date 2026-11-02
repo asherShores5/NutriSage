@@ -47,14 +47,15 @@ export function TrendChart({ points, bounds, showMin, goal = null, label }: { po
       {points.map((p, i) =>
         p.value !== null ? (
           <circle key={p.date} className={`trend-dot${p.inProgress ? " trend-today" : ""}`} cx={x(i)} cy={y(p.value)} r={3.5} data-date={p.date} data-value={p.value}>
-            <title>{`${p.date}: ${p.value}${p.inProgress ? " (today, in progress)" : ""}`}</title>
+            <title>{`${p.end ? `Week ${p.date} to ${p.end}, average` : p.date}: ${p.value}${p.inProgress ? " (today, in progress)" : ""}`}</title>
           </circle>
         ) : null,
       )}
       </g>
       {points.length > 0 && (
         <>
-          <text className="trend-label" x={PAD} y={H - 8}>{points[0].date.slice(5)}</text>
+          {/* Month-day, with the year too when the range crosses years (1y, All). */}
+          <text className="trend-label" x={PAD} y={H - 8}>{points[0].date.slice(0, 4) === points[points.length - 1].date.slice(0, 4) ? points[0].date.slice(5) : points[0].date}</text>
           <text className="trend-label" x={W - PAD} y={H - 8} textAnchor="end">{points[points.length - 1].inProgress ? "Today" : points[points.length - 1].date.slice(5)}</text>
         </>
       )}

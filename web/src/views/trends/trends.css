@@ -20,3 +20,11 @@
 .y-axis label { display: inline-flex; align-items: center; gap: 0.35rem; }
 .y-axis input[type="number"] { width: 5.5rem; }
 .y-axis-hint { flex-basis: 100%; margin: 0; }
+/* Range row (TrendRangeControls): presets as toggle buttons, then the custom start and end. */
+.trend-range { display: grid; gap: 0.5rem; }
+.trend-presets { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.trend-presets button { height: var(--control); min-width: 2.8rem; padding: 0 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-variant-numeric: tabular-nums; }
+.trend-presets button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.trend-custom { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
+.trend-custom label { display: flex; gap: 0.4rem; align-items: center; }
+.trend-range-error { margin: 0; flex-basis: 100%; }

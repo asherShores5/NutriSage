@@ -3,5 +3,5 @@
     "target": "ES2022", "module": "commonjs", "moduleResolution": "node",
     "strict": true, "noEmit": true, "skipLibCheck": true, "esModuleInterop": true, "types": ["node"]
   },
-  "include": ["bin", "lib", "test", "../schema/compose.ts"]
+  "include": ["bin", "lib", "scripts", "test", "../schema/compose.ts"]
 }

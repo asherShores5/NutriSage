@@ -4,6 +4,7 @@ import * as path from "node:path";
 import {
   CfnOutput, Duration, RemovalPolicy, Stack, type StackProps,
   aws_appsync as appsync,
+  aws_budgets as budgets,
   aws_cognito as cognito,
   aws_dynamodb as dynamodb,
   aws_lambda as lambda,
@@ -19,6 +20,8 @@ import { GuestEstimate } from "./guest";
 export const APP_DOMAIN = "nutrisage.ashershores.com";
 /** The two Members (admin-created). The API Lambda refuses any other username, even with a valid token. */
 export const USERNAMES = ["asher", "aubyn"];
+/** Budget alerts (the owner's personal address). */
+const BUDGET_EMAIL = "asher.shores5@gmail.com";
 const ROOT = path.join(__dirname, "..", "..");
 
 /** The composed schema/*.graphql, as a file for AppSync's Definition (see schema/compose.ts). */
@@ -28,12 +31,13 @@ function composedSchemaFile(sdl: string) {
   return file;
 }
 
-/** Data, auth and the Member API. Hosting (Cert/Web) and deploy CI (Ci) arrive in ticket 11. */
+/** Data, auth, the Member API, the Guest endpoint and the budget. Hosting: lib/hosting.ts. Deploy CI: lib/ci.ts. */
 export class AppStack extends Stack {
   readonly userPool: cognito.UserPool;
   readonly client: cognito.UserPoolClient;
   readonly api: appsync.GraphqlApi;
   readonly table: dynamodb.TableV2;
+  readonly guest: GuestEstimate;
 
   constructor(scope: Construct, id: string, props: StackProps) {
     super(scope, id, props);
@@ -120,7 +124,23 @@ export class AppStack extends Stack {
     }
 
     // ---- Guest estimates: a separate public endpoint with no access to the table above ----
-    new GuestEstimate(this, "GuestEstimate", { root: ROOT, allowOrigins: [`https://${APP_DOMAIN}`] });
+    this.guest = new GuestEstimate(this, "GuestEstimate", { root: ROOT, allowOrigins: [`https://${APP_DOMAIN}`] });
+
+    // ---- cost tripwire: $2/month (Asher, 2026-11-02) on the app=nutrisage tag (lib/app.ts) ----
+    const alert = (notificationType: string, threshold: number) => ({
+      notification: { notificationType, comparisonOperator: "GREATER_THAN", threshold },
+      subscribers: [{ subscriptionType: "EMAIL", address: BUDGET_EMAIL }],
+    });
+    new budgets.CfnBudget(this, "Budget", {
+      budget: {
+        budgetName: "nutrisage-monthly",
+        budgetType: "COST",
+        timeUnit: "MONTHLY",
+        budgetLimit: { amount: 2, unit: "USD" },
+        costFilters: { TagKeyValue: ["user:app$nutrisage"] },
+      },
+      notificationsWithSubscribers: [alert("ACTUAL", 80), alert("FORECASTED", 100)],
+    });
 
     new CfnOutput(this, "Region", { value: this.region });
     new CfnOutput(this, "UserPoolId", { value: userPool.userPoolId });
