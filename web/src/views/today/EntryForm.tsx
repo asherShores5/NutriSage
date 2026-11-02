@@ -1,8 +1,12 @@
 import { useId, useMemo, useState } from "react";
-import { MEALS, MEAL_LABELS, NUTRIENTS, SERVING, logFood, parseAmount, searchLibrary, type Entry, type Food, type Meal } from "@nutrisage/shared";
+import {
+  MEALS, MEAL_LABELS, NUTRIENTS, QUICK_ADD_PORTION, SERVING, formatAmount, isRecipe, logLibraryItem, parseAmount, recipeUnits, searchLibrary,
+  type Amount, type Entry, type LibraryItem, type Meal,
+} from "@nutrisage/shared";
 import { estimate } from "../../api/estimate";
 import { AmountPicker } from "../../components/AmountPicker";
-import { useFavoriteIds } from "../../library/useFavorites";
+import { StarButton } from "../../components/StarButton";
+import { useFavoriteIds, useFavorites } from "../../library/useFavorites";
 import { rememberFood, useLibrary } from "../../library/useLibrary";
 import { RecipeBuilder } from "./RecipeBuilder";
 import { useMealPick } from "./useMealPick";
@@ -20,6 +24,8 @@ const plain = (e: unknown) => String((e as Error)?.message ?? e).replace(/^(Vali
  * Library and logs it scaled to the amount. "Type nutrition by hand" switches to typing one
  * serving's numbers yourself (servings only, no gram weight). "Build a Recipe" opens the Recipe
  * builder (ticket 17) on its own screen; what it logs comes back through `onAdd`.
+ * Saved Recipes are matches too (ticket 19): one logs in a fraction of the batch or g as picked,
+ * else 1/4 of the batch (recipePortion). Each match has its Favorite star.
  */
 export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void }) {
   const [name, setName] = useState("");
@@ -31,30 +37,38 @@ export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [building, setBuilding] = useState(false);
-  const { foods } = useLibrary();
+  const { items } = useLibrary();
   // The Member's Favorites rank first among the matches.
   const favoriteIds = useFavoriteIds();
-  const hits = useMemo(() => (byHand ? [] : searchLibrary(foods, name, { favoriteIds })), [foods, name, byHand, favoriteIds]);
+  const favorites = useFavorites();
+  const hits = useMemo(() => (byHand ? [] : searchLibrary(items, name, { favoriteIds })), [items, name, byHand, favoriteIds]);
   /** A match chosen with the arrow keys (null: none, by Escape), only for the text it was chosen on. */
   const [cursor, setCursor] = useState<{ name: string; id: string | null }>();
   const pickedId = cursor?.name === name ? cursor.id : (hits.find((h) => h.whole)?.item.id ?? null);
   const known = hits.find((h) => h.item.id === pickedId)?.item;
   const units = formUnits(known, byHand);
   const listId = useId();
-  /** The picked unit, or serving when the typed name no longer offers it. */
-  const shownUnit = units.includes(unit) ? unit : SERVING;
+  /** The picked unit, or the first offered (serving; a Recipe's batch, at 1/4) when the typed name doesn't offer it. */
+  const fitsUnit = units.includes(unit);
+  const shownUnit = fitsUnit ? unit : units[0];
+  const shownAmount = !fitsUnit && known && isRecipe(known) ? formatAmount(QUICK_ADD_PORTION.amount) : amount;
 
   function resetAmount() {
     setAmount("1");
     setUnit(SERVING);
   }
 
-  /** Log `food` at the typed amount; the unit when it has it, else servings. */
-  function logLibraryFood(food: Food) {
-    const u = food.units.some((x) => x.label === unit) ? unit : SERVING;
-    const a = parseAmount(amount, u);
-    if (!a.ok) return setError(a.error);
-    const r = logFood(food, { amount: a.amount, unit: u }, meal);
+  /** Log a Food at the typed amount (the unit when it has it, else servings), or a Recipe in its unit, else 1/4 of the batch. */
+  function logLibraryFood(item: LibraryItem) {
+    const fits = isRecipe(item) ? recipeUnits(item).includes(unit) : item.units.some((x) => x.label === unit);
+    let to: Amount;
+    if (fits || !isRecipe(item)) {
+      const u = fits ? unit : SERVING;
+      const a = parseAmount(amount, u);
+      if (!a.ok) return setError(a.error);
+      to = { amount: a.amount, unit: u };
+    } else to = { ...QUICK_ADD_PORTION };
+    const r = logLibraryItem(item, to, meal);
     if (!r.ok) return setError(r.error);
     setError(undefined);
     onAdd(r.entry);
@@ -90,9 +104,9 @@ export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void
       return;
     }
     if (!name.trim()) return setError("Type a Food to estimate");
+    if (known) return logLibraryFood(known);
     const a = parseAmount(amount, shownUnit);
     if (!a.ok) return setError(a.error);
-    if (known) return logLibraryFood(known);
     setBusy(true);
     setError(undefined);
     try {
@@ -142,12 +156,21 @@ export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => !busy && logLibraryFood(item)}
             >
-              {item.name}
+              <span className="search-hit-name">
+                {item.name}
+                {isRecipe(item) && <small className="item-kind"> Recipe</small>}
+              </span>
+              {favorites.loaded && (
+                // A tap on the star stars it; it doesn't log the match.
+                <span onClick={(e) => e.stopPropagation()}>
+                  <StarButton name={item.name} starred={favorites.isFavorite(item.id)} onToggle={() => favorites.toggle(item.id)} />
+                </span>
+              )}
             </li>
           ))}
         </ul>
       )}
-      <AmountPicker amount={amount} unit={shownUnit} units={units} onAmount={setAmount} onUnit={setUnit} />
+      <AmountPicker amount={shownAmount} unit={shownUnit} units={units} onAmount={(t) => { setAmount(t); setUnit(shownUnit); }} onUnit={(u) => { setAmount(shownAmount); setUnit(u); }} />
       {known && <p className="entry-form-known" role="status">In the Library: logs from {known.name}</p>}
       {byHand && (
         <div className="nutrient-inputs" role="group" aria-label="Nutrition for 1 serving">

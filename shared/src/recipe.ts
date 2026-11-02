@@ -33,7 +33,15 @@ export interface RecipeIngredient {
   nutrition: Nutrition;
   /** The Food's Yield ratio (prepared / raw weight), when known; an unweighed Prepared weight is estimated from it. */
   yieldRatio?: number | null;
+  /**
+   * Set when this ingredient is a portion of a saved Recipe (ticket 19, `libraryId` is its id): that
+   * portion's own breakdown, Foods only, since Recipes nest one level deep (see recipeBook.ts).
+   */
+  ingredients?: NestedIngredient[] | null;
 }
+
+/** One ingredient of a saved Recipe used inside another Recipe: never a Recipe itself. */
+export type NestedIngredient = Omit<RecipeIngredient, "ingredients">;
 
 /** A Recipe before it has an id and owner (the builder's draft, or a Recipe logged without saving). */
 export interface NewRecipe {
@@ -144,6 +152,22 @@ const clean = (s: unknown) => (typeof s === "string" ? s.trim().replace(/\s+/g, 
 const inRange = (v: unknown, max: number): v is number => typeof v === "number" && Number.isFinite(v) && v > 0 && v <= max;
 
 function checkIngredient(src: RecipeIngredient): RecipeIngredient | string {
+  const r = checkFoodIngredient(src);
+  if (typeof r === "string" || src.ingredients === null || src.ingredients === undefined) return r;
+  // A portion of a saved Recipe: its breakdown is checked like any ingredient, one level deep only.
+  if (!Array.isArray(src.ingredients) || src.ingredients.length > RECIPE_LIMITS.ingredients) return `${r.name}: bad Recipe breakdown`;
+  if (!src.ingredients.length) return r;
+  const ingredients: NestedIngredient[] = [];
+  for (const sub of src.ingredients as RecipeIngredient[]) {
+    if (sub?.ingredients !== null && sub?.ingredients !== undefined) return `${r.name}: Recipes nest only one level deep`;
+    const x = checkFoodIngredient(sub);
+    if (typeof x === "string") return `${r.name}: ${x}`;
+    ingredients.push(x);
+  }
+  return { ...r, ingredients };
+}
+
+function checkFoodIngredient(src: NestedIngredient): NestedIngredient | string {
   const name = clean(src?.name);
   if (!name || name.length > RECIPE_LIMITS.nameLength) return `Ingredient names must be 1-${RECIPE_LIMITS.nameLength} characters`;
   const unit = clean(src.unit);

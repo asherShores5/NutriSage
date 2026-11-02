@@ -4,13 +4,14 @@
 // Ticket 12: the `library` query, and addEstimatedFood, which the Member estimate resolver calls so
 // every estimated Food lands here (names deduplicated case-insensitively). Ticket 15: putFood (edit,
 // either Member) and deleteFood (also removes every Member's Favorite of it). Ticket 17: Recipes at
-// RECIPE#<id> and addRecipe (save to the Recipe Book); ticket 19 adds editing and deleting them.
+// RECIPE#<id> and addRecipe (save to the Recipe Book). Ticket 19: putRecipe and deleteRecipe (like
+// putFood/deleteFood), and a saved Recipe as an ingredient one level deep (nestingError, shared).
 // Ticket 18: suggestYieldRatio (Bedrock fills in a Food's missing Yield ratio, for the Recipe
 // builder) and ingredient estimates filling in a known Food's missing ratio. A ratio a Member typed
 // (putFood) is never overwritten by a suggestion.
 import { GetCommand, PutCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import {
-  NUTRIENT_KEYS, checkRecipe, editedFood, findFoodByName, foodFromServing, foodNameKey, type Food, type FoodEdit, type NewRecipe, type Recipe,
+  NUTRIENT_KEYS, checkRecipe, editedFood, nestingError, findFoodByName, foodFromServing, foodNameKey, type Food, type FoodEdit, type NewRecipe, type Recipe,
 } from "@nutrisage/shared";
 import { UserError, invalid } from "../errors";
 import { estimateFood, type Estimate } from "../estimate";
@@ -141,6 +142,8 @@ async function addRecipe(username: string, id: string, input: unknown): Promise<
   const all = await listRecipes();
   const existing = all.find((x) => x.id === id);
   if (existing) return existing;
+  const nesting = nestingError({ id, ...r.recipe }, all);
+  if (nesting) throw invalid(nesting);
   const clash = all.find((x) => foodNameKey(x.name) === foodNameKey(r.recipe.name));
   if (clash) throw invalid(`The Recipe Book already has ${clash.name}`);
   if (all.length >= LIBRARY_LIMITS.recipes) throw invalid("The Recipe Book is full");
@@ -153,6 +156,33 @@ async function addRecipe(username: string, id: string, input: unknown): Promise<
     if ((e as Error).name !== "ConditionalCheckFailedException") throw e;
     const now = (await listRecipes()).find((x) => x.id === id);
     if (now) return now;
+    throw e;
+  }
+  return recipe;
+}
+
+const recipeGone = () => new UserError("NotFound", "That Recipe is no longer in the Recipe Book");
+
+/**
+ * Edit a saved Recipe (either Member): ingredients, name and Prepared weight. Its id and createdBy
+ * stay; Entries logged from it keep their snapshot, and so do other Recipes that use it as an ingredient.
+ */
+async function putRecipe(id: string, input: unknown): Promise<Recipe> {
+  const r = checkRecipe((input ?? {}) as NewRecipe);
+  if (!r.ok) throw invalid(r.error);
+  const all = await listRecipes();
+  const existing = all.find((x) => x.id === id);
+  if (!existing) throw recipeGone();
+  const clash = all.find((x) => x.id !== id && foodNameKey(x.name) === foodNameKey(r.recipe.name));
+  if (clash) throw invalid(`The Recipe Book already has ${clash.name}`);
+  const nesting = nestingError({ id, ...r.recipe }, all);
+  if (nesting) throw invalid(nesting);
+  const recipe: Recipe = { id, ...r.recipe, createdBy: existing.createdBy, updatedAt: Math.max(Date.now(), existing.updatedAt) };
+  try {
+    // Only replace a Recipe that is still there, so an edit racing a delete doesn't bring it back.
+    await ddb().send(new PutCommand({ TableName: TABLE, Item: { PK: HOUSEHOLD_PK, SK: recipeKey(id), ...recipe }, ConditionExpression: "attribute_exists(PK)" }));
+  } catch (e) {
+    if ((e as Error).name === "ConditionalCheckFailedException") throw recipeGone();
     throw e;
   }
   return recipe;
@@ -197,19 +227,24 @@ async function putFood(id: string, input: unknown): Promise<Food> {
 const members = () => (process.env.ALLOWED_USERNAMES ?? "").split(",").filter(Boolean);
 
 /**
- * Delete a Food and, in the same transaction, every Member's Favorite of it, so it drops out of
+ * Delete a Library item (Food or Recipe) and, in the same transaction, every Member's Favorite of it, so it drops out of
  * everyone's Quick Add. Entries keep their snapshot and their (now dangling) reference. Deleting
- * a Food that's already gone succeeds, so a retry is harmless.
+ * an item that's already gone succeeds, so a retry is harmless.
  */
-async function deleteFood(id: string): Promise<string> {
+async function deleteItem(id: string, sk: string): Promise<string> {
   const del = (PK: string, SK: string) => ({ Delete: { TableName: TABLE, Key: { PK, SK } } });
   await ddb().send(
     new TransactWriteCommand({
-      TransactItems: [...members().map((u) => del(memberPk(u), favoriteKey(id))), del(HOUSEHOLD_PK, foodKey(id))],
+      TransactItems: [...members().map((u) => del(memberPk(u), favoriteKey(id))), del(HOUSEHOLD_PK, sk)],
     }),
   );
   return id;
 }
+
+const deleteFood = (id: string) => deleteItem(id, foodKey(id));
+
+/** Delete a saved Recipe the same way: every Member's Favorite of it goes too; Entries and Recipes using it keep their snapshots. */
+const deleteRecipe = (id: string) => deleteItem(id, recipeKey(id));
 
 export const library: ResolverModule = {
   Query: {
@@ -224,5 +259,7 @@ export const library: ResolverModule = {
     deleteFood: (_ctx, args) => deleteFood(foodId(args.id)),
     suggestYieldRatio: (_ctx, args) => suggestYieldRatio(foodId(args.id)),
     addRecipe: (ctx, args) => addRecipe(ctx.username, recipeId(args.id), args.input),
+    putRecipe: (_ctx, args) => putRecipe(recipeId(args.id), args.input),
+    deleteRecipe: (_ctx, args) => deleteRecipe(recipeId(args.id)),
   },
 };

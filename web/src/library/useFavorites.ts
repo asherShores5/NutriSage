@@ -3,7 +3,7 @@
 // Member's local copy (sync/memberData.ts) and written through the outbox like Days and goals, so
 // starring works offline; a Guest's Favorites stay on the device (api/favorites.ts).
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { quickAdd, type Favorite, type Food } from "@nutrisage/shared";
+import { quickAdd, type Favorite, type LibraryItem } from "@nutrisage/shared";
 import { currentFavorites, favoritesError, noteLogged, subscribe, toggleFavorite, watchFavorites } from "../sync/memberData";
 import { useLibrary } from "./useLibrary";
 
@@ -19,14 +19,14 @@ export function useFavoriteIds(): ReadonlySet<string> {
   return useMemo(() => new Set(favorites.map((f) => f.libraryId)), [favorites]);
 }
 
-/** Favorites, Quick Add (the starred Library Foods, most recently used first) and the actions on them. */
+/** Favorites, Quick Add (the starred Library Foods and Recipes, most recently used first) and the actions on them. */
 export function useFavorites() {
   const favorites = useSyncExternalStore(subscribe, currentFavorites);
   const error = useSyncExternalStore(subscribe, favoritesError);
-  const { foods } = useLibrary();
+  const { items: library } = useLibrary();
   useEffect(watchFavorites, []);
   const ids = useMemo(() => new Set((favorites ?? NONE).map((f) => f.libraryId)), [favorites]);
-  const items: Food[] = useMemo(() => quickAdd(favorites ?? NONE, foods), [favorites, foods]);
+  const items: LibraryItem[] = useMemo(() => quickAdd(favorites ?? NONE, library), [favorites, library]);
   return {
     /** False until the Favorites first load (stars stay hidden so a tap can't race the load). */
     loaded: favorites !== undefined,

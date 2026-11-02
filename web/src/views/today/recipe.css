@@ -25,7 +25,8 @@
 .recipe-portion { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .recipe-portion-head { width: 100%; font-size: 0.85rem; color: var(--muted); }
 .recipe-save { display: flex; gap: 0.5rem; align-items: center; }
-.recipe-actions { display: flex; justify-content: flex-end; }
+.recipe-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.recipe-actions .danger { margin-right: auto; }
 
 /* A Recipe Entry's breakdown, in the Entry editor. */
 .entry-ingredients h4 { margin: 0 0 0.3rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }

@@ -31,7 +31,7 @@ async function logFromAddBox(name: string) {
 }
 
 await c.check("Quick Add starts empty, with a hint to star something", async () => {
-  await expect(quick.getByText(/Star an Entry/)).toBeVisible();
+  await expect(quick.getByText(/Star a Food or Recipe/)).toBeVisible();
 });
 
 await c.check("star two items from their Entries: the newer star is first in Quick Add", async () => {
@@ -81,12 +81,12 @@ await c.check("unstarring removes it from Quick Add", async () => {
 await c.check("deleting a starred Food in the Library drops it from Quick Add at once; its Entries stay", async () => {
   await tab(p, "Profile");
   await p.getByRole("button", { name: "Open Library" }).click();
-  await p.getByRole("list", { name: "Foods" }).getByRole("button", { name: /Greek yogurt/ }).click();
+  await p.getByRole("list", { name: "Foods" }).getByRole("button", { name: /^Greek yogurt/ }).click();
   p.once("dialog", (d) => void d.accept());
   await p.getByRole("form", { name: "Edit Greek yogurt" }).getByRole("button", { name: "Delete" }).click();
-  await expect(p.getByRole("list", { name: "Foods" }).getByRole("button", { name: /Greek yogurt/ })).toHaveCount(0);
+  await expect(p.getByRole("list", { name: "Foods" }).getByRole("button", { name: /^Greek yogurt/ })).toHaveCount(0);
   await tab(p, "Today");
-  await expect(quick.getByText(/Star an Entry/)).toBeVisible();
+  await expect(quick.getByText(/Star a Food or Recipe/)).toBeVisible();
   await expect(entries.getByText("Greek yogurt").first()).toBeVisible();
   await expect(entries.getByRole("button", { name: /star Greek yogurt/i })).toHaveCount(0);
   if (db.dump().some((r) => r.SK === "FAV#food-yogurt")) throw new Error("the Favorite was left on the server");
@@ -95,7 +95,7 @@ await c.check("deleting a starred Food in the Library drops it from Quick Add at
 await c.check("Favorites are per Member: aubyn's Quick Add is empty", async () => {
   const q = await app.open("aubyn");
   c.watch(q);
-  await expect(q.getByRole("region", { name: "Quick Add" }).getByText(/Star an Entry/)).toBeVisible();
+  await expect(q.getByRole("region", { name: "Quick Add" }).getByText(/Star a Food or Recipe/)).toBeVisible();
   await q.context().close();
 });
 

@@ -1,7 +1,7 @@
 // A Guest's data, in this browser's storage only (spec: Guest access). Nothing here talks to a
 // server. Shape: { days: { [date]: Day }, library: Food[], recipes: Recipe[], goals: Goals, favorites: Favorite[] }.
 import {
-  GUEST_CREATOR, NUTRIENT_KEYS, checkRecipe, defaultGoals, editedFood, findFoodByName, foodFromServing, foodNameKey, guestSeed,
+  GUEST_CREATOR, NUTRIENT_KEYS, checkRecipe, nestingError, defaultGoals, editedFood, findFoodByName, foodFromServing, foodNameKey, guestSeed,
   type Day, type Favorite, type Food, type FoodEdit, type Goals, type NewRecipe, type Recipe, type ServingInput,
 } from "@nutrisage/shared";
 
@@ -123,12 +123,40 @@ export function addGuestRecipe(id: string, input: NewRecipe): Recipe {
   const data = read();
   const existing = data.recipes.find((x) => x.id === id);
   if (existing) return existing;
+  const nesting = nestingError({ id, ...r.recipe }, data.recipes);
+  if (nesting) throw new Error(nesting);
   const clash = data.recipes.find((x) => foodNameKey(x.name) === foodNameKey(r.recipe.name));
   if (clash) throw new Error(`The Recipe Book already has ${clash.name}`);
   const recipe: Recipe = { id, ...r.recipe, createdBy: GUEST_CREATOR, updatedAt: Date.now() };
   data.recipes.push(recipe);
   write(data);
   return recipe;
+}
+
+/** Edit a Recipe in the Guest's device Recipe Book, like the Member `putRecipe` (same checks, same words). */
+export function putGuestRecipe(id: string, input: NewRecipe): Recipe {
+  const r = checkRecipe(input);
+  if (!r.ok) throw new Error(r.error);
+  const data = read();
+  const existing = data.recipes.find((x) => x.id === id);
+  if (!existing) throw new Error("That Recipe is no longer in the Recipe Book");
+  const clash = data.recipes.find((x) => x.id !== id && foodNameKey(x.name) === foodNameKey(r.recipe.name));
+  if (clash) throw new Error(`The Recipe Book already has ${clash.name}`);
+  const nesting = nestingError({ id, ...r.recipe }, data.recipes);
+  if (nesting) throw new Error(nesting);
+  const recipe: Recipe = { id, ...r.recipe, createdBy: existing.createdBy, updatedAt: Date.now() };
+  data.recipes = data.recipes.map((x) => (x.id === id ? recipe : x));
+  write(data);
+  return recipe;
+}
+
+/** Delete a Recipe from the Guest's device Recipe Book and Favorites, like the Member `deleteRecipe`. Days are untouched. */
+export function deleteGuestRecipe(id: string): string {
+  const data = read();
+  data.recipes = data.recipes.filter((x) => x.id !== id);
+  data.favorites = data.favorites.filter((f) => f.libraryId !== id);
+  write(data);
+  return id;
 }
 
 /** The Guest's goals, like the Member `goals` query. */

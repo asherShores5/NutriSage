@@ -21,6 +21,7 @@ Not a workspace, so CI never installs it.
     npx tsx search.ts          # fuzzy search in the add box: 'chik brst', typos, arrow keys, nonsense + Enter estimates, Guest Library
     npx tsx recipes.ts         # Recipe builder: 3 ingredients (one estimated), live totals, log 350 g, expand the breakdown; 1/4 batch unsaved
     npx tsx yieldRatios.ts     # unweighed Recipe: Prepared weight estimated from (Bedrock-suggested) Yield ratios; edit one, it's saved on the Food; log in g
+    npx tsx recipeBook.ts      # Recipe Book: save, find in search, star, Quick Add 1/4 batch, nest one level, edit in Library, delete
     npx tsx week.ts            # Week streak/averages/total vs seeded Days; Trends metric chart
     npx tsx trends.ts          # Trends gaps: no data on unlogged Days, dashed bridges, today in progress
     npx tsx trendsYAxis.ts     # Trends Y-axis: fit, from 0, manual min/max; goal line (water goal; none for weight)

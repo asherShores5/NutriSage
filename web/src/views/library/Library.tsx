@@ -1,27 +1,38 @@
 import { useMemo, useState } from "react";
-import { NUTRIENTS, foodEdit, foodNameKey, type Food } from "@nutrisage/shared";
+import { NUTRIENTS, foodEdit, foodNameKey, preparedWeight, recipeTotals, type Food, type Recipe } from "@nutrisage/shared";
 import { deleteFood, putFood } from "../../api/library";
 import { NetworkError } from "../../api/errors";
+import { StarButton } from "../../components/StarButton";
 import { isGuest } from "../../session";
 import { foodToForm, readFoodForm, type FoodFormValues } from "../../library/foodForm";
-import { forgetFavorite } from "../../library/useFavorites";
+import { forgetFavorite, useFavorites } from "../../library/useFavorites";
 import { forgetFood, rememberFood, useLibrary } from "../../library/useLibrary";
+import { RecipeBuilder } from "../today/RecipeBuilder";
 import "./library.css";
 
 /**
  * The Library screen (ticket 15), opened from Profile: every Food, and an editor for its name,
  * nutrition per serving, units and Yield ratio, or to delete it. Either Member may edit any Food;
  * a Guest edits their own device Library. Entries already logged keep their snapshots.
+ * Ticket 19: the Recipe Book below the Foods; a Recipe opens in the Recipe builder to edit its
+ * ingredients and Prepared weight, or delete it. Every Food and Recipe has its Favorite star.
  */
 export function Library({ onClose }: { onClose: () => void }) {
-  const { foods, loaded, error } = useLibrary();
+  const { foods, recipes, loaded, error } = useLibrary();
+  const favorites = useFavorites();
   const [filter, setFilter] = useState("");
   const [openId, setOpenId] = useState<string>();
-  const shown = useMemo(() => {
+  const [openRecipeId, setOpenRecipeId] = useState<string>();
+  const matching = <T extends { name: string }>(list: T[]) => {
     const key = foodNameKey(filter);
-    return foods.filter((f) => !key || foodNameKey(f.name).includes(key)).sort((a, b) => a.name.localeCompare(b.name));
-  }, [foods, filter]);
+    return list.filter((f) => !key || foodNameKey(f.name).includes(key)).sort((a, b) => a.name.localeCompare(b.name));
+  };
+  const shown = useMemo(() => matching(foods), [foods, filter]);
+  const shownRecipes = useMemo(() => matching(recipes), [recipes, filter]);
   const open = foods.find((f) => f.id === openId);
+  const openRecipe = recipes.find((r) => r.id === openRecipeId);
+  const star = (id: string, name: string) =>
+    favorites.loaded && <StarButton name={name} starred={favorites.isFavorite(id)} onToggle={() => favorites.toggle(id)} />;
 
   return (
     <div className="library">
@@ -29,7 +40,7 @@ export function Library({ onClose }: { onClose: () => void }) {
         <button type="button" className="link" onClick={onClose}>‹ Profile</button>
         <h2>Library</h2>
       </div>
-      <p className="hint">{isGuest() ? "The Foods on this device." : "Every Food either of you has logged."} Fix a name or the nutrition here; Entries already logged don't change.</p>
+      <p className="hint">{isGuest() ? "The Foods and Recipes on this device." : "Every Food and Recipe either of you has logged or saved."} Fix a name or the nutrition here; Entries already logged don't change.</p>
       {error && <p className="error" role="alert">{error}</p>}
       {open ? (
         <FoodEditor key={open.id} food={open} onDone={() => setOpenId(undefined)} />
@@ -44,16 +55,38 @@ export function Library({ onClose }: { onClose: () => void }) {
             <ul className="library-list" aria-label="Foods">
               {shown.map((f) => (
                 <li key={f.id}>
-                  <button type="button" onClick={() => setOpenId(f.id)}>
+                  <button type="button" className="library-open" onClick={() => setOpenId(f.id)}>
                     <span className="library-name">{f.name}</span>
                     <small>{summary(f)}</small>
                   </button>
+                  {star(f.id, f.name)}
                 </li>
               ))}
             </ul>
           )}
+          {loaded && (
+            <>
+              <h3 className="library-section">Recipe Book</h3>
+              {shownRecipes.length === 0 ? (
+                <p className="empty">{recipes.length ? "No Recipe matches." : "No Recipes yet. Build one from Today's add box and keep Save to Recipe Book on."}</p>
+              ) : (
+                <ul className="library-list" aria-label="Recipe Book">
+                  {shownRecipes.map((r) => (
+                    <li key={r.id}>
+                      <button type="button" className="library-open" onClick={() => setOpenRecipeId(r.id)}>
+                        <span className="library-name">{r.name}</span>
+                        <small>{recipeSummary(r)}</small>
+                      </button>
+                      {star(r.id, r.name)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
         </>
       )}
+      {openRecipe && <RecipeBuilder key={openRecipe.id} recipe={openRecipe} onClose={() => setOpenRecipeId(undefined)} onSaved={() => setOpenRecipeId(undefined)} />}
     </div>
   );
 }
@@ -62,6 +95,13 @@ export function Library({ onClose }: { onClose: () => void }) {
 function summary(food: Food) {
   const e = foodEdit(food);
   return `${Math.round(e.nutrition.calories)} cal · ${e.servingGrams === null ? "per serving" : `${Math.round(e.servingGrams)} g serving`}`;
+}
+
+/** "1610 cal · 1200 g batch · 3 ingredients". */
+function recipeSummary(recipe: Recipe) {
+  const w = preparedWeight(recipe);
+  const n = recipe.ingredients.length;
+  return `${Math.round(recipeTotals(recipe).calories)} cal${w ? ` · ${Math.round(w.grams)} g batch` : ""} · ${n} ingredient${n === 1 ? "" : "s"}`;
 }
 
 function FoodEditor({ food, onDone }: { food: Food; onDone: () => void }) {

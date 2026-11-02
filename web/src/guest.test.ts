@@ -197,6 +197,28 @@ describe("a Guest", () => {
     expect(requests).toEqual([]);
   });
 
+  it("edits and deletes Recipes in their device Recipe Book (Favorite of it goes too); nesting stays one level deep", async () => {
+    const { session, recipes, favorites, store } = await launch();
+    session.enterGuest();
+    const n = { carbs: 0, protein: 0, fat: 0, fiber: 0, sodium: 0, iron: 0, calories: 100 };
+    const beans = { libraryId: null, name: "Beans", amount: 1, unit: "can", grams: 400, nutrition: n };
+    const chili = await recipes.addRecipe("r1", { name: "Chili", ingredients: [beans], preparedGrams: 400 });
+    expect(await recipes.getRecipes()).toEqual([chili]);
+    const edited = await recipes.putRecipe("r1", { name: "Chili", ingredients: [beans, beans], preparedGrams: 700 });
+    expect(edited).toMatchObject({ id: "r1", preparedGrams: 700, ingredients: [beans, beans] });
+    await expect(recipes.putRecipe("nope", { name: "X", ingredients: [beans] })).rejects.toThrow("That Recipe is no longer in the Recipe Book");
+
+    const inner = { ...beans, libraryId: "r1", name: "Chili", ingredients: [beans] };
+    await recipes.addRecipe("r2", { name: "Burrito", ingredients: [inner] });
+    await expect(recipes.addRecipe("r3", { name: "Plate", ingredients: [{ ...beans, libraryId: "r2", name: "Burrito" }] })).rejects.toThrow("Burrito already has a Recipe in it");
+
+    await favorites.putFavorite({ libraryId: "r1", lastUsed: 5 });
+    expect(await recipes.deleteRecipe("r1")).toBe("r1");
+    expect(store.guestRecipes().map((r) => r.id)).toEqual(["r2"]);
+    expect(store.guestFavorites()).toEqual([]);
+    expect(requests).toEqual([]);
+  });
+
   it("sees the server's limit message as is", async () => {
     const { session, estimate } = await launch();
     session.enterGuest();

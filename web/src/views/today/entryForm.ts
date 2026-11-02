@@ -1,7 +1,7 @@
 // The Entry form's rules (estimated or hand-typed), kept pure so they're testable without a DOM.
 import {
-  GRAMS, NUTRIENTS, SERVING, logFood, parseAmount, scaleSnapshot, servingUnits,
-  type Amount, type Entry, type Food, type Meal, type NutrientKey, type Nutrition,
+  GRAMS, NUTRIENTS, SERVING, isRecipe, logFood, parseAmount, recipeUnits, scaleSnapshot, servingUnits,
+  type Amount, type Entry, type LibraryItem, type Meal, type NutrientKey, type Nutrition,
 } from "@nutrisage/shared";
 import type { Estimate } from "../../api/estimate";
 
@@ -50,10 +50,12 @@ export function entryFromEstimate(est: Estimate, meal: Meal, to: Amount): EntryF
 }
 
 /**
- * Unit labels for the add box: the picked Library Food's own units, serving and g for a new Food
- * (Bedrock gives the serving's weight), only serving by hand.
+ * Unit labels for the add box: the picked Library Food's own units, a picked Recipe's (batch, and g
+ * once its Prepared weight is known), serving and g for a new Food (Bedrock gives the serving's
+ * weight), only serving by hand.
  */
-export function formUnits(picked: Food | undefined, byHand: boolean): string[] {
+export function formUnits(picked: LibraryItem | undefined, byHand: boolean): string[] {
   if (byHand) return [SERVING];
-  return picked ? picked.units.map((u) => u.label) : [SERVING, GRAMS];
+  if (!picked) return [SERVING, GRAMS];
+  return isRecipe(picked) ? recipeUnits(picked) : picked.units.map((u) => u.label);
 }
