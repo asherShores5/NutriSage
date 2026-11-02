@@ -2,7 +2,7 @@
 // date range to points; the chart only draws them. Unlogged Days are no data (never 0), segments
 // across them are bridged, and today is in progress (ticket 20). Long ranges are weekly averages
 // via TrendOptions.bucket (21); manual Y bounds and a goal line via YMode/trendBounds/trendGoal (22).
-// Still to plug in: a second series with its own bounds (23: call trendSeries/trendSegments/trendBounds again per series).
+// A second metric overlays on its own right-hand axis with its own bounds (trendOverlay, 23).
 import { isDateKey, type Day } from "./day";
 import type { Goals } from "./goals";
 import { NUTRIENTS, num, sumMacros, type NutrientKey } from "./nutrients";
@@ -146,7 +146,7 @@ export interface TrendSegment {
   inProgress: boolean;
 }
 
-/** The line through a series: each point with data joins the next one with data. Works for any series (ticket 23's second metric too). */
+/** The line through a series: each point with data joins the next one with data. Works for any series (the second metric too). */
 export function trendSegments(points: readonly TrendPoint[]): TrendSegment[] {
   const out: TrendSegment[] = [];
   let prev = -1;
@@ -172,7 +172,7 @@ export interface ManualBounds {
   max: number | null;
 }
 
-/** What one series' bounds depend on besides its points (each series passes its own; ticket 23). */
+/** What one series' bounds depend on besides its points (each series passes its own). */
 export interface BoundsOptions {
   /** Used in manual mode. */
   manual?: ManualBounds;
@@ -214,4 +214,43 @@ function autoBounds(points: readonly TrendPoint[], fit: boolean, goal: number | 
 export function trendSummary(points: readonly TrendPoint[]): { logged: number; max: number | null } {
   const present = points.map((p) => p.value).filter((v): v is number => v !== null);
   return { logged: present.length, max: present.length ? Math.max(...present) : null };
+}
+
+/** How one series of the chart is built: its metric, Y mode, manual bounds and (primary only) goal line. */
+export interface TrendLineSpec {
+  metric: TrendMetric;
+  mode: YMode;
+  manual?: ManualBounds;
+  /** The goal line, drawn for the primary metric only (a second spec's goal is ignored). */
+  goal?: number | null;
+}
+
+/** One drawn series: its points and the bounds of its own axis. */
+export interface TrendLine {
+  metric: TrendMetric;
+  points: TrendPoint[];
+  bounds: YBounds;
+}
+
+/**
+ * The chart's series: the primary metric on the left axis and an optional second metric on a
+ * right-hand axis. Both follow the same range and bucket; each gets its own bounds from its own
+ * mode (and manual min/max). The goal line belongs to the primary metric, so only it stretches
+ * the primary axis. No second metric, or the same one twice, is no overlay.
+ */
+export function trendOverlay(
+  days: DaysByDate<TrendDay>,
+  range: TrendRange,
+  opts: TrendOptions,
+  primary: TrendLineSpec,
+  second?: TrendLineSpec | null,
+): { primary: TrendLine; second: TrendLine | null } {
+  const line = (s: TrendLineSpec, goal: number | null): TrendLine => {
+    const points = trendSeries(days, s.metric, range, opts);
+    return { metric: s.metric, points, bounds: trendBounds(points, s.mode, { manual: s.manual, goal }) };
+  };
+  return {
+    primary: line(primary, primary.goal ?? null),
+    second: second && second.metric !== primary.metric ? line(second, null) : null,
+  };
 }

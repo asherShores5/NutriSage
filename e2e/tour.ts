@@ -39,6 +39,12 @@ async function sweep(p: Page, name: string) {
   await p.getByLabel("Y-axis min").fill("1800");
   await p.getByLabel("Y-axis max").fill("2200");
   await shot(p, `tour-${name}-03d-trends-manual`);
+  // A second metric on the right-hand axis (calories vs weight), with its legend.
+  await p.getByLabel("Y-axis scale").selectOption("zero");
+  await p.getByLabel("Compare with").selectOption("weight");
+  await p.waitForTimeout(200);
+  await shot(p, `tour-${name}-03e-trends-second-metric`);
+  await p.getByLabel("Compare with").selectOption("");
   // Today's form switched to typing nutrition by hand.
   await tab(p, "Today");
   await p.getByRole("button", { name: "Type nutrition by hand" }).click();

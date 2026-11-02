@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TREND_METRICS, TREND_PRESETS, customRange, defaultYMode, presetRange, trendBounds, trendBucket, trendGoal, trendSegments, trendSeries, trendSummary } from "./trends";
+import { TREND_METRICS, TREND_PRESETS, customRange, defaultYMode, presetRange, trendBounds, trendBucket, trendGoal, trendSegments, trendSeries, trendSummary, trendOverlay } from "./trends";
 
 const e = (carbs: number, calories: number) => ({ nutrition: { carbs, calories } });
 
@@ -225,5 +225,54 @@ describe("customRange", () => {
     expect(customRange("", "2026-01-05", today)).toEqual({ error: "Pick a start and an end." });
     expect(customRange("2026-02-30", "2026-03-01", today)).toEqual({ error: "Pick a start and an end." });
     expect(customRange("2026-03-01", "2026-04-01", today)).toEqual({ error: "End can't be after today." });
+  });
+});
+
+describe("trendOverlay: a second metric on its own right-hand axis", () => {
+  // Weight vs calories: values hundreds of units apart, so a shared axis would flatten weight.
+  const range = { from: "2026-03-01", to: "2026-03-04" };
+  const days = {
+    "2026-03-01": { entries: [e(0, 1800)], weight: 172 },
+    "2026-03-02": { entries: [e(0, 2400)] },
+    "2026-03-03": { entries: [], weight: 170 },
+    "2026-03-04": { entries: [e(0, 2100)], weight: 171 },
+  };
+
+  it("the second series has its own points and its own bounds, separate from the primary's", () => {
+    const o = trendOverlay(days, range, {}, { metric: "calories", mode: "zero" }, { metric: "weight", mode: "fit" });
+    expect(o.primary.points.map((p) => p.value)).toEqual([1800, 2400, null, 2100]);
+    expect(o.primary.bounds).toEqual({ min: 0, max: 2400 });
+    expect(o.second!.points.map((p) => p.value)).toEqual([172, null, 170, 171]);
+    expect(o.second!.bounds).toEqual({ min: 170, max: 172 });
+  });
+
+  it("the goal line stays with the primary metric: it stretches only the primary axis", () => {
+    const o = trendOverlay(days, range, {}, { metric: "calories", mode: "fit", goal: 2600 }, { metric: "water", mode: "zero" });
+    expect(o.primary.bounds).toEqual({ min: 1800, max: 2600 });
+    expect(o.second!.bounds).toEqual({ min: 0, max: 1 }); // no water logged: 0 on logged Days, no goal stretch
+  });
+
+  it("each series uses its own manual bounds", () => {
+    const o = trendOverlay(days, range, {}, { metric: "calories", mode: "manual", manual: { min: 1000, max: 3000 } }, { metric: "weight", mode: "manual", manual: { min: 160, max: null } });
+    expect(o.primary.bounds).toEqual({ min: 1000, max: 3000 });
+    expect(o.second!.bounds).toEqual({ min: 160, max: 172 });
+  });
+
+  it("both series follow the same range and weekly buckets", () => {
+    const long = { from: "2026-02-20", to: "2026-03-04" };
+    const o = trendOverlay(days, long, { bucket: "week", today: "2026-03-04" }, { metric: "calories", mode: "zero" }, { metric: "weight", mode: "fit" });
+    expect(o.primary.points.map((p) => [p.date, p.end, p.value, p.inProgress])).toEqual([
+      ["2026-02-20", "2026-02-25", null, false],
+      ["2026-02-26", "2026-03-04", 2100, true],
+    ]);
+    expect(o.second!.points.map((p) => [p.date, p.end, p.value, p.inProgress])).toEqual([
+      ["2026-02-20", "2026-02-25", null, false],
+      ["2026-02-26", "2026-03-04", 171, true],
+    ]);
+  });
+
+  it("no second metric, or the same metric twice, means no overlay", () => {
+    expect(trendOverlay(days, range, {}, { metric: "calories", mode: "zero" }).second).toBeNull();
+    expect(trendOverlay(days, range, {}, { metric: "calories", mode: "zero" }, { metric: "calories", mode: "fit" }).second).toBeNull();
   });
 });

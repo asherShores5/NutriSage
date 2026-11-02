@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { TREND_ALL_FROM, TREND_METRICS, dateKey, presetRange, trendBounds, trendBucket, trendGoal, trendSeries, trendSummary, type TrendMetric, type TrendRange } from "@nutrisage/shared";
+import { TREND_ALL_FROM, TREND_METRICS, dateKey, presetRange, trendBucket, trendGoal, trendOverlay, trendSummary, type TrendMetric, type TrendRange } from "@nutrisage/shared";
 import { useGoals } from "../goals/useGoals";
 import { useDays } from "../week/useDays";
 import { TrendChart } from "./TrendChart";
 import { TrendRangeControls, choiceLabel, type TrendRangeChoice } from "./TrendRangeControls";
-import { YAxisControls, defaultYAxis } from "./YAxisControls";
+import { YAxisControls, defaultYAxis, type YAxis } from "./YAxisControls";
 import "./trends.css";
+
+/** The second metric's starting Y-axis: fit to its data, so its shape reads next to the primary's. */
+const SECOND_Y_AXIS: YAxis = { mode: "fit", manual: { min: null, max: null } };
 
 /** The range Trends opens on. */
 const DEFAULT_RANGE: TrendRangeChoice = { preset: "30d" };
@@ -13,7 +16,8 @@ const DEFAULT_RANGE: TrendRangeChoice = { preset: "30d" };
 /**
  * The Trends tab: one metric over a range (presets or custom; over ~90 days, weekly averages).
  * Unlogged Days are no data, bridged with a dashed segment; today is in progress. The Y-axis is
- * fit, from 0 or manual, with a goal line at the Member's goal (22). Ticket 23 adds a second metric.
+ * fit, from 0 or manual, with a goal line at the Member's goal (22). A second metric overlays on a
+ * right-hand axis with its own bounds and Y-axis setting, same range and buckets, plus a legend (23).
  */
 export function Trends() {
   const today = dateKey(new Date());
@@ -28,13 +32,21 @@ export function Trends() {
   const { goals } = useGoals();
   const [yAxis, setYAxis] = useState(() => defaultYAxis(metric));
   const [showGoal, setShowGoal] = useState(true);
-  const pickMetric = (m: TrendMetric) => { setMetric(m); setYAxis(defaultYAxis(m)); };
+  const [second, setSecond] = useState<TrendMetric | null>(null);
+  const [secondAxis, setSecondAxis] = useState<YAxis>(SECOND_Y_AXIS);
+  const secondInfo = TREND_METRICS.find((m) => m.key === second);
+  const pickMetric = (m: TrendMetric) => { setMetric(m); setYAxis(defaultYAxis(m)); if (m === second) setSecond(null); };
+  const pickSecond = (m: TrendMetric | null) => { setSecond(m); setSecondAxis(SECOND_Y_AXIS); };
 
-  const points = days ? trendSeries(days, metric, range, { today, bucket }) : [];
-  const summary = trendSummary(points);
   const goal = trendGoal(goals, metric);
   const goalLine = showGoal ? goal : null;
-  const bounds = trendBounds(points, yAxis.mode, { manual: yAxis.manual, goal: goalLine });
+  const overlay = days
+    ? trendOverlay(days, range, { today, bucket }, { metric, mode: yAxis.mode, manual: yAxis.manual, goal: goalLine }, second && { metric: second, mode: secondAxis.mode, manual: secondAxis.manual })
+    : null;
+  const points = overlay?.primary.points ?? [];
+  const bounds = overlay?.primary.bounds ?? { min: 0, max: 1 };
+  const right = overlay?.second ?? null;
+  const summary = trendSummary(points);
   const label = choiceLabel(choice);
   const lower = label.charAt(0).toLowerCase() + label.slice(1);
   const weekly = bucket === "week";
@@ -59,7 +71,31 @@ export function Trends() {
               : `No data for ${lower}.`}
           </p>
           <YAxisControls key={metric} value={yAxis} onChange={setYAxis} bounds={bounds} goal={goal} showGoal={showGoal} onShowGoal={setShowGoal} />
-          <TrendChart points={points} bounds={bounds} showMin={bounds.min !== 0} goal={goalLine} label={`${info.label}, ${lower}`} />
+          <label className="trend-second-pick">
+            Compare with{" "}
+            <select aria-label="Compare with" value={second ?? ""} onChange={(e) => pickSecond((e.target.value || null) as TrendMetric | null)}>
+              <option value="">None</option>
+              {TREND_METRICS.filter((m) => m.key !== metric).map((m) => (
+                <option key={m.key} value={m.key}>{m.key === "water" ? "Water (cups)" : m.label}</option>
+              ))}
+            </select>
+          </label>
+          {right && <YAxisControls key={second} label="Right axis" value={secondAxis} onChange={setSecondAxis} bounds={right.bounds} goal={null} showGoal={false} onShowGoal={() => {}} />}
+          <TrendChart
+            points={points}
+            bounds={bounds}
+            showMin={bounds.min !== 0}
+            goal={goalLine}
+            label={`${info.label}${secondInfo && right ? ` and ${secondInfo.label}` : ""}, ${lower}`}
+            second={right && { points: right.points, bounds: right.bounds, showMin: right.bounds.min !== 0 }}
+            secondName={secondInfo?.label}
+          />
+          {right && secondInfo && (
+            <ul className="trend-key" aria-label="Legend">
+              <li><span className="trend-swatch" aria-hidden="true" />{info.label} (left axis)</li>
+              <li className="trend-second"><span className="trend-swatch" aria-hidden="true" />{secondInfo.label} (right axis)</li>
+            </ul>
+          )}
           {summary.logged > 0 && (
             <p className="hint trend-legend">
               {weekly ? "Each dot: a week's average over logged Days. Dashed: weeks with no data." : "Dashed: Days with no data."}
