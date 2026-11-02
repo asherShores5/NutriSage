@@ -5,7 +5,7 @@ import { guestDays, putGuestDay } from "../guest/store";
 import { isGuest } from "../session";
 import { NUTRITION, gql } from "./gql";
 
-const DAY = `date entries { id meal name nutrition { ${NUTRITION} } grams amount unit } water weight updatedAt`;
+const DAY = `date entries { id meal name nutrition { ${NUTRITION} } grams amount unit libraryId } water weight updatedAt`;
 
 export async function getDays(from: string, to: string): Promise<Day[]> {
   if (isGuest()) return guestDays(from, to);

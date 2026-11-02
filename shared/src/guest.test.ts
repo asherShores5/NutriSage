@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MEALS } from "./day";
+import { logFood } from "./food";
 import { guestSeed } from "./guest";
 
 describe("a Guest's demo data", () => {
@@ -27,12 +28,15 @@ describe("a Guest's demo data", () => {
     expect(new Set(seed.days.flatMap((d) => d.entries.map((e) => e.id))).size).toBe(24);
   });
 
-  it("has a demo Library of 8 Foods with their serving nutrition", () => {
+  it("has a demo Library of 8 Foods, per gram, logging one serving as the menu says", () => {
     expect(seed.library.map((f) => f.name)).toEqual([
       "2 eggs and toast", "Greek yogurt with berries", "Grilled chicken salad", "Turkey sandwich",
       "Salmon with rice and broccoli", "Spaghetti with meat sauce", "Apple", "Handful of almonds",
     ]);
-    expect(seed.library.find((f) => f.name === "Apple")).toMatchObject({ nutrition: { carbs: 25, calories: 95 } });
+    const apple = seed.library.find((f) => f.name === "Apple")!;
+    expect(apple.units).toEqual([{ label: "serving", grams: 182 }, { label: "g", grams: 1 }]);
+    expect(logFood(apple, { amount: 1, unit: "serving" }, "snack")).toMatchObject({ ok: true, entry: { grams: 182, nutrition: { carbs: 25, calories: 95 }, libraryId: "demo-apple" } });
+    expect(new Set(seed.library.map((f) => f.createdBy))).toEqual(new Set(["guest"]));
   });
 
   it("has demo goals for every nutrient and water", () => {

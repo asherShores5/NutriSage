@@ -20,6 +20,8 @@ type Entry {
   amount: Float
   "serving, g or a Food's own unit. Null on migrated Entries."
   unit: String
+  "The Library item it was logged from, if any. A pointer only: the snapshot is what counts."
+  libraryId: ID
 }
 
 input EntryInput {
@@ -30,6 +32,7 @@ input EntryInput {
   grams: Float
   amount: Float
   unit: String
+  libraryId: ID
 }
 
 type Day {

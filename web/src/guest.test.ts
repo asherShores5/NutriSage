@@ -34,6 +34,7 @@ async function launch() {
     days: await import("./api/days"),
     estimate: await import("./api/estimate"),
     goals: await import("./api/goals"),
+    library: await import("./api/library"),
   };
 }
 
@@ -102,6 +103,37 @@ describe("a Guest", () => {
     const r = await estimate.estimate("apple");
     expect(r.servingGrams).toBe(182);
     expect(requests).toEqual([{ url: "https://guest.example/estimate", body: { text: "apple" } }]);
+  });
+
+  it("has the demo Library as Foods per gram, from this device only", async () => {
+    const { session, library } = await launch();
+    session.enterGuest();
+    const foods = await library.getLibrary();
+    expect(foods).toHaveLength(8);
+    expect(foods.find((f) => f.name === "Apple")?.units).toEqual([{ label: "serving", grams: 182 }, { label: "g", grams: 1 }]);
+    expect(requests).toEqual([]);
+  });
+
+  it("adds what they estimate to their own device Library, deduplicated by name", async () => {
+    const { session, estimate, library } = await launch();
+    session.enterGuest();
+    guestReply = { status: 200, body: { name: "Pear", nutrition: { carbs: 27, protein: 0.6, fat: 0.2, fiber: 5.5, sodium: 2, iron: 0.3, calories: 101 }, servingGrams: 178, yieldRatio: null, units: [{ label: "slice", grams: 20 }] } };
+    const r = await estimate.estimate("Pear");
+    expect(r.food).toMatchObject({ name: "Pear", units: [{ label: "serving", grams: 178 }, { label: "g", grams: 1 }, { label: "slice", grams: 20 }] });
+    const again = await estimate.estimate("PEAR");
+    expect(again.food?.id).toBe(r.food?.id);
+    const names = (await (await launch()).library.getLibrary()).map((f) => f.name);
+    expect(names.filter((n) => n.toLowerCase() === "pear")).toEqual(["Pear"]);
+    expect(names).toHaveLength(9);
+    expect(requests.every((q) => q.url === "https://guest.example/estimate")).toBe(true);
+  });
+
+  it("an older device Library (one serving each, no units) still reads as Foods", async () => {
+    storage.setItem("nutrisage.guest", "1");
+    storage.setItem("nutrisage.guest.data", JSON.stringify({ days: {}, goals: {}, library: [{ id: "demo-apple", name: "Apple", meal: "snack", nutrition: { carbs: 25, protein: 0, fat: 0, fiber: 4, sodium: 2, iron: 0.2, calories: 95 } }] }));
+    const { library } = await launch();
+    const [apple] = await library.getLibrary();
+    expect(apple).toMatchObject({ id: "demo-apple", name: "Apple", units: [{ label: "serving", grams: 1 }], nutrition: { calories: 95 } });
   });
 
   it("sees the server's limit message as is", async () => {

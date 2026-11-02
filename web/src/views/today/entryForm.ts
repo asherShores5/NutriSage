@@ -1,7 +1,7 @@
 // The Entry form's rules (estimated or hand-typed), kept pure so they're testable without a DOM.
 import {
-  NUTRIENTS, SERVING, parseAmount, scaleSnapshot, servingUnits,
-  type Amount, type Entry, type Meal, type NutrientKey, type Nutrition,
+  GRAMS, NUTRIENTS, SERVING, findFoodByName, logFood, parseAmount, scaleSnapshot, servingUnits,
+  type Amount, type Entry, type Food, type Meal, type NutrientKey, type Nutrition,
 } from "@nutrisage/shared";
 import type { Estimate } from "../../api/estimate";
 
@@ -38,9 +38,24 @@ export function readEntryForm({ name, meal, values, amount }: EntryFormValues): 
   return { ok: true, entry: { meal, name: trimmed, amount: a.amount, unit: SERVING, nutrition: r.nutrition } };
 }
 
-/** The Entry for `to` of an estimated serving: Bedrock's nutrition scaled, plus grams when known. */
+/**
+ * The Entry for `to` of an estimated serving. Once the estimate is saved to the Library, it logs from
+ * that Food (pointing at it); otherwise Bedrock's serving scaled, plus grams when known.
+ */
 export function entryFromEstimate(est: Estimate, meal: Meal, to: Amount): EntryFormResult {
+  if (est.food) return logFood(est.food, to, meal);
   const r = scaleSnapshot({ nutrition: est.nutrition, grams: est.servingGrams }, { amount: 1, unit: SERVING }, to, servingUnits(est.servingGrams));
   if (!r.ok) return r;
   return { ok: true, entry: { meal, name: est.name, amount: to.amount, unit: to.unit, nutrition: r.nutrition, ...(r.grams ? { grams: r.grams } : {}) } };
+}
+
+/**
+ * Unit labels for the add box: a Library Food's own units when the typed name is that Food,
+ * serving and g for a new Food (Bedrock gives the serving's weight), only serving by hand.
+ * Ticket 13's fuzzy search replaces the exact-name match.
+ */
+export function formUnits(library: readonly Food[], name: string, byHand: boolean): string[] {
+  if (byHand) return [SERVING];
+  const food = findFoodByName(library, name);
+  return food ? food.units.map((u) => u.label) : [SERVING, GRAMS];
 }

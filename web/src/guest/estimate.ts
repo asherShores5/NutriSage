@@ -5,7 +5,8 @@ import type { Estimate } from "../api/estimate";
 
 const UNAVAILABLE = "Couldn't estimate that right now. Try again, or type the nutrition by hand.";
 
-export async function guestEstimate(text: string): Promise<Estimate> {
+/** The Guest endpoint's reply: an estimate, never saved anywhere on the server. */
+export async function guestEstimate(text: string): Promise<Omit<Estimate, "food">> {
   const url = getConfig().guestEstimateUrl;
   if (!url) throw new Error(UNAVAILABLE);
   let r: Response;
@@ -20,5 +21,5 @@ export async function guestEstimate(text: string): Promise<Estimate> {
   }
   const body = await r.json().catch(() => undefined);
   if (!r.ok) throw new Error(typeof body?.message === "string" ? body.message : UNAVAILABLE);
-  return body as Estimate;
+  return body as Omit<Estimate, "food">;
 }
