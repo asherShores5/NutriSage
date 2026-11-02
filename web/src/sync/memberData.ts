@@ -9,10 +9,15 @@
 //   outbox, then reload every open Day and the goals, so changes from other devices show up.
 // - Every write carries the whole row: last write wins per Day. A row with a queued write keeps
 //   the local copy over the server's until that write lands.
+// - Except a Day changed here while this device may not hold the server's current copy (opened
+//   offline, offline or unreachable since it last loaded, or the write itself had to wait): that
+//   write is merged with the server's copy just before it's sent (mergeDays in shared, a three-way
+//   merge against the copy the change started from), so it never wipes what another device
+//   logged meanwhile.
 // - Only a signed-in Member's copy is saved; it's dropped when a different Member (or nobody)
 //   signs in on this device. A Guest's data already lives on the device (guest/store.ts, behind
 //   the same api/ calls), so for a Guest this is an in-memory copy only.
-import { bumpFavorites, daysByDate, toggleFavorite as toggled, type Day, type Favorite, type Goals } from "@nutrisage/shared";
+import { bumpFavorites, daysByDate, mergeDays, toggleFavorite as toggled, type Day, type Favorite, type Goals } from "@nutrisage/shared";
 import { getDays, putDay } from "../api/days";
 import { NetworkError } from "../api/errors";
 import { deleteFavorite, getFavorites, putFavorite } from "../api/favorites";
@@ -34,6 +39,13 @@ interface Cache {
   days: Record<string, Day>;
   goals?: Goals;
   favorites?: Favorite[];
+  /**
+   * Days with a queued write: the server copy the change started from (null: none, e.g. opened
+   * offline) and whether the write must be merged with the server's copy when sent (see the top).
+   */
+  pending?: Record<string, { base: Day | null; merge: boolean }>;
+  /** Days started empty here while offline: no server copy behind them yet. */
+  offlineStarted?: string[];
 }
 
 const dayRow = (date: string) => `DAY#${date}`;
@@ -57,6 +69,8 @@ const edits = new Map<string, number>();
 const watched = new Map<string, number>();
 let goalsWatched = false;
 let favoritesWatched = false;
+/** Dates whose copy here came from the server since the API was last unreachable (in memory only). */
+const fresh = new Set<string>();
 let started = false;
 let retry: ReturnType<typeof setTimeout> | undefined;
 
@@ -74,7 +88,7 @@ function readJSON<T>(key: string): T | undefined {
 
 function readCache(u: string | undefined): Cache {
   const c = persisted(u) ? readJSON<Cache>(CACHE) : undefined;
-  return c && c.user === u ? { user: u, days: c.days ?? {}, goals: c.goals, favorites: c.favorites } : { user: u, days: {} };
+  return c && c.user === u ? { user: u, days: c.days ?? {}, goals: c.goals, favorites: c.favorites, pending: c.pending, offlineStarted: c.offlineStarted } : { user: u, days: {} };
 }
 
 function readOps(u: string | undefined): Op[] {
@@ -105,7 +119,7 @@ function newOutbox(u: string | undefined) {
     },
     send: (op) => {
       switch (op.type) {
-        case "putDay": return putDay(op.day);
+        case "putDay": return sendDay(op.day);
         case "putGoals": return putGoals(op.goals);
         case "putFavorite": return putFavorite(op.favorite);
         case "deleteFavorite": return deleteFavorite(op.libraryId);
@@ -113,7 +127,10 @@ function newOutbox(u: string | undefined) {
     },
     onSent: (op, result, stillPending) => {
       if (stillPending) return;
-      if (op.type === "putDay") cache.days = { ...cache.days, [op.day.date]: result as Day };
+      if (op.type === "putDay") {
+        cache.days = { ...cache.days, [op.day.date]: result as Day };
+        settled(op.day.date);
+      }
       else if (op.type === "putGoals") cache.goals = result as Goals;
       else if (op.type === "putFavorite") {
         // The server keeps the newer last-used time (another device may have logged it later).
@@ -133,6 +150,7 @@ function newOutbox(u: string | undefined) {
     },
     onReachable: (reachable) => {
       if (reachable) return;
+      wentOffline();
       clearTimeout(retry);
       retry = setTimeout(() => void outbox.flush(), RETRY_MS);
     },
@@ -140,6 +158,30 @@ function newOutbox(u: string | undefined) {
 }
 
 let outbox = newOutbox(user);
+
+/** The server's copy of a Day is now here (loaded or just written): nothing to merge for it. */
+function settled(date: string) {
+  const { [date]: _, ...rest } = cache.pending ?? {};
+  cache.pending = rest;
+  cache.offlineStarted = cache.offlineStarted?.filter((d) => d !== date);
+  fresh.add(date);
+}
+
+/** The API can't be reached: no copy here can be trusted as current, and every queued Day write must merge. */
+function wentOffline() {
+  fresh.clear();
+  if (!cache.pending) return;
+  cache.pending = Object.fromEntries(Object.entries(cache.pending).map(([d, p]) => [d, { ...p, merge: true }]));
+  writeCache();
+}
+
+/** Write a Day; one that may be behind the server's copy is merged with it first (see the top). */
+async function sendDay(day: Day): Promise<Day> {
+  const p = cache.pending?.[day.date];
+  if (!p?.merge) return putDay(day);
+  const [server] = await getDays(day.date, day.date);
+  return putDay(mergeDays(day, server, p.base ?? undefined));
+}
 
 // Another Member signed in (or out), or Guest mode started or ended: drop the last copy (and,
 // on sign out, the saved one and its queued writes) so nobody sees the last person's data.
@@ -154,6 +196,7 @@ function switchOwner() {
   cache = readCache(user);
   errors = {};
   edits.clear();
+  fresh.clear();
   outbox = newOutbox(user);
   emit();
   void resume();
@@ -174,12 +217,17 @@ async function loadDay(date: string, keepError = false) {
     const [server] = await getDays(date, date);
     if ((edits.get(row) ?? 0) !== at || outbox.pendingFor(row)) return; // a newer local change wins
     cache.days = { ...cache.days, [date]: server ?? emptyDay(date) };
+    settled(date);
     writeCache();
     if (!keepError) errors = { ...errors, [row]: undefined };
   } catch (e) {
     if (e instanceof NetworkError) {
+      wentOffline();
       // Offline with nothing on the device yet: start the Day empty so logging still works.
-      if (!cache.days[date]) cache.days = { ...cache.days, [date]: emptyDay(date) };
+      if (!cache.days[date]) {
+        cache.days = { ...cache.days, [date]: emptyDay(date) };
+        cache.offlineStarted = [...(cache.offlineStarted ?? []), date];
+      }
     } else {
       errors = { ...errors, [row]: (e as Error).message };
     }
@@ -231,6 +279,9 @@ export function resume(): Promise<void> {
   resuming ??= (async () => {
     if (!user) return;
     await outbox.flush();
+    // The first flush may have joined a send that started before the connection came back (and
+    // failed with it): try once more now rather than waiting for the retry timer.
+    if (outbox.pending().length) await outbox.flush();
     await Promise.all([
       ...[...watched.keys()].map((d) => loadDay(d)),
       goalsWatched ? loadGoals() : undefined,
@@ -244,6 +295,10 @@ if (typeof window !== "undefined") {
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && void resume());
   window.addEventListener("focus", () => void resume());
   window.addEventListener("online", () => void resume());
+  window.addEventListener("offline", wentOffline);
+  // Another device may write while this one is in the background: until the reload on return,
+  // treat every copy here as possibly behind.
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && fresh.clear());
 }
 
 // ---- Days ------------------------------------------------------------------
@@ -272,6 +327,10 @@ export function watchDay(date: string): () => void {
 export function saveDay(day: Day) {
   const row = dayRow(day.date);
   bump(row);
+  // The first change since the server's copy: remember that copy, to merge against if needed.
+  const prev = cache.pending?.[day.date];
+  const base = prev ? prev.base : cache.offlineStarted?.includes(day.date) ? null : (cache.days[day.date] ?? null);
+  cache.pending = { ...cache.pending, [day.date]: { base, merge: !!prev?.merge || !fresh.has(day.date) } };
   cache.days = { ...cache.days, [day.date]: day };
   errors = { ...errors, [row]: undefined };
   writeCache();
@@ -288,10 +347,17 @@ export async function readDay(date: string): Promise<Day> {
   try {
     const [server] = await getDays(date, date);
     if (outbox.pendingFor(dayRow(date))) return cache.days[date];
-    return server ?? emptyDay(date);
+    const day = server ?? emptyDay(date);
+    cache.days = { ...cache.days, [date]: day };
+    settled(date);
+    writeCache();
+    return day;
   } catch (e) {
     if (!(e instanceof NetworkError)) throw e;
-    return cache.days[date] ?? emptyDay(date);
+    wentOffline();
+    if (cache.days[date]) return cache.days[date];
+    cache.offlineStarted = [...(cache.offlineStarted ?? []), date];
+    return emptyDay(date);
   }
 }
 
