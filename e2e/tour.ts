@@ -17,6 +17,10 @@ async function sweep(p: Page, name: string) {
     await p.waitForTimeout(200);
     await shot(p, `tour-${name}-${String(i + 1).padStart(2, "0")}-${t.toLowerCase()}`);
   }
+  // Today's form switched to typing nutrition by hand.
+  await tab(p, "Today");
+  await p.getByRole("button", { name: "Type nutrition by hand" }).click();
+  await shot(p, `tour-${name}-01b-today-by-hand`);
 }
 
 await sweep(await app.open("asher"), "phone");

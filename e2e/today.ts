@@ -1,4 +1,4 @@
-// Walking skeleton (ticket 01): sign in with a password, log an Entry by hand, see it on Today
+// Walking skeleton (ticket 01): sign in with a password, log an Entry by hand (estimates: estimate.ts), see it on Today
 // with totals; it persists, and only for that Member.
 import { expect } from "playwright/test";
 import { launch, todayKey } from "./app";
@@ -26,6 +26,7 @@ await c.check("logs an Entry by hand into a Meal and shows it with totals", asyn
   const p = await app.open("asher");
   c.watch(p);
   const form = p.getByRole("form", { name: "Add an Entry" });
+  await form.getByRole("button", { name: "Type nutrition by hand" }).click();
   await form.getByLabel("Food").fill("Greek yogurt");
   await form.getByLabel("Meal").selectOption("snack");
   await form.getByLabel("Protein").fill("17");
@@ -54,6 +55,7 @@ await c.check("a bad nutrient shows a message and logs nothing", async () => {
   c.watch(p);
   const form = p.getByRole("form", { name: "Add an Entry" });
   await expect(p.getByRole("region", { name: "Entries" })).toBeVisible();
+  await form.getByRole("button", { name: "Type nutrition by hand" }).click();
   await form.getByLabel("Food").fill("Mystery");
   await form.getByLabel("Fat").fill("-3");
   await form.getByRole("button", { name: "Add Entry" }).click();

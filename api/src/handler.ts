@@ -4,6 +4,7 @@ import type { AppSyncIdentityCognito, AppSyncResolverEvent } from "aws-lambda";
 import { UserError } from "./errors";
 import { RESOLVERS } from "./resolvers";
 
+export { setBedrockClient } from "./estimate";
 export { setDocClient } from "./table";
 
 const ALLOWED = (process.env.ALLOWED_USERNAMES ?? "").split(",").filter(Boolean);

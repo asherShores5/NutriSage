@@ -11,7 +11,10 @@ export function EntryList({ entries }: { entries: Entry[] }) {
           <ul>
             {list.map((e) => (
               <li key={e.id} className="entry">
-                <span className="entry-name">{e.name}</span>
+                <span className="entry-name">
+                  {e.name}
+                  {e.grams ? <span className="entry-grams">{Math.round(e.grams)} g</span> : null}
+                </span>
                 <span className="entry-cal">{Math.round(e.nutrition.calories)} cal</span>
               </li>
             ))}

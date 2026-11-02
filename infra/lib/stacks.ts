@@ -12,6 +12,7 @@ import {
 } from "aws-cdk-lib";
 import type { Construct } from "constructs";
 import { composeSchemaDir, rootFields } from "../../schema/compose";
+import { allowEstimates } from "./estimate";
 
 /** Served by the hosting stacks (ticket 11). */
 export const APP_DOMAIN = "nutrisage.ashershores.com";
@@ -81,12 +82,14 @@ export class AppStack extends Stack {
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64,
       memorySize: 256,
-      timeout: Duration.seconds(10),
+      // A Bedrock estimate takes a few seconds; AppSync gives up on a Lambda at 30 s.
+      timeout: Duration.seconds(25),
       environment: { TABLE_NAME: table.tableName, ALLOWED_USERNAMES: USERNAMES.join(",") },
       bundling: { minify: true, sourceMap: true, format: nodejs.OutputFormat.ESM, target: "node22" },
       logGroup: new logs.LogGroup(this, "ApiLogs", { retention: logs.RetentionDays.TWO_WEEKS, removalPolicy: RemovalPolicy.DESTROY }),
     });
     table.grantReadWriteData(fn);
+    allowEstimates(fn);
 
     const sdl = composeSchemaDir();
     const api = (this.api = new appsync.GraphqlApi(this, "Api", {

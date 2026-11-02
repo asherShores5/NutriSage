@@ -4,10 +4,12 @@
 //   beforeEach(() => h.reset());
 //   await h.call(h.A, "putDay", { input });
 //   const days = await h.call(h.B, "days", { from, to });
+//   h.bedrock.reply('{"carbs": 1, ...}'); await h.call(h.A, "estimate", { text: "2 eggs" });
 //
-// handler.ts reads TABLE_NAME / ALLOWED_USERNAMES at import time, so tests must import the
+// handler.ts reads TABLE_NAME / ALLOWED_USERNAMES / MODEL_ID at import time, so tests must import the
 // handler through this module (never statically) for the env below to take effect.
 import type { AppSyncIdentityCognito, AppSyncResolverEvent } from "aws-lambda";
+import { FakeBedrock } from "./fakeBedrock";
 import { FakeDocClient } from "./fakeDynamo";
 
 export interface Member {
@@ -20,12 +22,15 @@ export const memberB: Member = { userId: "sub-b", username: "member-b" };
 
 process.env.TABLE_NAME = process.env.TABLE_NAME ?? "test-table";
 process.env.ALLOWED_USERNAMES = process.env.ALLOWED_USERNAMES ?? `${memberA.username},${memberB.username}`;
+process.env.MODEL_ID = process.env.MODEL_ID ?? "test-model";
 
-const { handler, setDocClient } = await import("../handler");
+const { handler, setDocClient, setBedrockClient } = await import("../handler");
 const { QUERY_FIELDS } = await import("../resolvers");
 
 const db = new FakeDocClient();
 setDocClient(db);
+const bedrock = new FakeBedrock();
+setBedrockClient(bedrock);
 
 /** AppSync-shaped resolver event for one Member calling one field. */
 export function appSyncEvent(member: Member, fieldName: string, args: Record<string, unknown> = {}) {
@@ -51,8 +56,13 @@ export function harness() {
     A: memberA,
     B: memberB,
     db,
-    /** Empty the table. */
-    reset: () => db.reset(),
+    /** The stubbed model: script its reply with `bedrock.reply(text)` or `bedrock.fail(err)`. */
+    bedrock,
+    /** Empty the table and forget Bedrock calls. */
+    reset: () => {
+      db.reset();
+      bedrock.reset();
+    },
     event: appSyncEvent,
     /** Invoke the handler as `member`. Rejects with the same Error the client would see. */
     call: (member: Member, fieldName: string, args: Record<string, unknown> = {}): Promise<any> =>

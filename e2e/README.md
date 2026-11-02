@@ -11,6 +11,7 @@ Not a workspace, so CI never installs it.
     npm run build:web          # repo root
     cd e2e && npm install && npx playwright install chromium
     npx tsx today.ts           # walking skeleton: sign in, log an Entry, totals, persistence
+    npx tsx estimate.ts        # type a Food, log the (stubbed) Bedrock estimate
     npx tsx tour.ts            # screenshots of every tab: phone, desktop, dark
 
 Screenshots go to `/tmp/e2e-nutrisage-<checkout folder>/` (override with `E2E_OUT`), so parallel
