@@ -28,3 +28,11 @@
 .trend-custom { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
 .trend-custom label { display: flex; gap: 0.4rem; align-items: center; }
 .trend-range-error { margin: 0; flex-basis: 100%; }
+/* Second metric (23): its own color (--series2, contrast >= 4:1 on the card in light and dark) and square dots. */
+.trend-second { --bar: var(--series2); }
+.trend-overlay .trend-label-primary { fill: var(--bar); }
+.trend-second .trend-label { fill: var(--series2); }
+.trend-second-pick { display: inline-flex; align-items: center; gap: 0.35rem; }
+.trend-key { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0; padding: 0; list-style: none; font-size: 0.85rem; color: var(--muted); }
+.trend-key li { display: inline-flex; align-items: center; gap: 0.4rem; }
+.trend-swatch { width: 1.1rem; height: 0.3rem; border-radius: 2px; background: var(--bar); }
