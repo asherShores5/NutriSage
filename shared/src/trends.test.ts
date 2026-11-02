@@ -61,6 +61,13 @@ describe("trendBounds", () => {
     expect(trendBounds(pts(171.4, null, 169.8), "fit")).toEqual({ min: 169.8, max: 171.4 });
   });
 
+  it("fit mode leaves out today's in-progress point (still drawn), unless it's the only data", () => {
+    const withToday = [...pts(2100, 1900), { date: "2026-03-03", value: 450, inProgress: true }];
+    expect(trendBounds(withToday, "fit")).toEqual({ min: 1900, max: 2100 });
+    expect(trendBounds([{ date: "2026-03-03", value: 450, inProgress: true }], "fit")).toEqual({ min: 450, max: 450 });
+    expect(trendBounds(withToday, "zero")).toEqual({ min: 0, max: 2100 });
+  });
+
   it("never has a max under 1, and with no points is 0..1", () => {
     expect(trendBounds(pts(0, 0), "zero")).toEqual({ min: 0, max: 1 });
     expect(trendBounds(pts(null, null), "fit")).toEqual({ min: 0, max: 1 });

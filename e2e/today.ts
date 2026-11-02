@@ -1,7 +1,7 @@
 // Walking skeleton (ticket 01): sign in with a password, log an Entry by hand (estimates: estimate.ts), see it on Today
 // with its bars; it persists, and only for that Member.
 import { expect } from "playwright/test";
-import { launch, todayKey } from "./app";
+import { CSP, cspViolations, launch, todayKey } from "./app";
 import { PASSWORD, db } from "./backend";
 import { checklist, lastCall } from "./lib";
 
@@ -20,6 +20,21 @@ await c.check("signs in with a password and lands on Today", async () => {
   await p.getByRole("button", { name: "Sign in with password" }).click();
   await expect(p.getByRole("heading", { name: "Today" })).toBeVisible();
   await expect(p.getByText("Nothing logged yet today.")).toBeVisible();
+  await p.context().close();
+});
+
+await c.check("runs under the deployed Content-Security-Policy (inline script and outside hosts are blocked)", async () => {
+  const p = await app.open("asher");
+  c.watch(p);
+  const res = await p.reload();
+  if (res?.headers()["content-security-policy"] !== CSP) throw new Error("the app wasn't served with the CSP");
+  await expect(p.getByRole("heading", { name: "Today" })).toBeVisible();
+  const before = cspViolations.length;
+  const inline = () => { const s = document.createElement("script"); s.textContent = "window.__ran = 1"; document.head.appendChild(s); return (window as any).__ran ? "ran" : "blocked"; };
+  expect(await p.evaluate(inline)).toBe("blocked");
+  expect(await p.evaluate(() => fetch("https://example.com/").then(() => "sent", () => "blocked"))).toBe("blocked");
+  await expect.poll(() => cspViolations.length).toBeGreaterThanOrEqual(before + 2);
+  cspViolations.splice(before); // these two were on purpose
   await p.context().close();
 });
 

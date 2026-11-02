@@ -2,7 +2,7 @@
 // math itself (totals, raw weight, portions) is in shared/src/recipe.ts.
 import {
   BATCH, YIELD_MAX, checkRecipe, foodFromServing, formatAmount, ingredientFromFood, ingredientFromRecipe, ingredientUnits, isWeighed, logRecipe,
-  parseAmount, recipeUnits, rescaleIngredient,
+  parseAmount, readNumberBox, recipeUnits, rescaleIngredient,
   type Entry, type Food, type Meal, type NewRecipe, type PreparedWeightSource, type Recipe, type RecipeIngredient,
 } from "@nutrisage/shared";
 import type { Estimate } from "../../api/estimate";
@@ -65,10 +65,9 @@ export function switchPortionUnit(text: string, from: string, to: string, prepar
 
 /** The typed Prepared weight: null when blank (not weighed), else grams, or a message. */
 export function readPrepared(text: string): { ok: true; grams: number | null } | { ok: false; error: string } {
-  const t = text.trim().replace(",", ".");
-  if (!t) return { ok: true, grams: null };
-  const g = Number(t);
-  if (!Number.isFinite(g) || g <= 0) return { ok: false, error: "Prepared weight must be a number of grams, more than 0" };
+  const g = readNumberBox(text, null);
+  if (g === null) return { ok: true, grams: null };
+  if (g === undefined || g <= 0) return { ok: false, error: "Prepared weight must be a number of grams, more than 0" };
   return { ok: true, grams: g };
 }
 
@@ -81,10 +80,9 @@ export function preparedNote(weight: { grams: number; source: PreparedWeightSour
 
 /** A typed Yield ratio: blank is unknown (counted as 1), else a number more than 0 and at most YIELD_MAX. */
 export function readYieldRatio(text: string): { ok: true; ratio: number | null } | { ok: false; error: string } {
-  const t = text.trim().replace(",", ".");
-  if (!t) return { ok: true, ratio: null };
-  const y = Number(t);
-  if (!Number.isFinite(y) || y <= 0 || y > YIELD_MAX) return { ok: false, error: `Yield ratio must be more than 0 and at most ${YIELD_MAX}` };
+  const y = readNumberBox(text, null);
+  if (y === null) return { ok: true, ratio: null };
+  if (y === undefined || y <= 0 || y > YIELD_MAX) return { ok: false, error: `Yield ratio must be more than 0 and at most ${YIELD_MAX}` };
   return { ok: true, ratio: y };
 }
 

@@ -6,7 +6,7 @@
 // (the bare model ID can't be invoked on demand). Keep a Sonnet-class model: estimates are mostly
 // recall of branded and restaurant items, where Haiku underestimated portions.
 import { BedrockRuntimeClient, ConverseCommand, type ConverseCommandOutput } from "@aws-sdk/client-bedrock-runtime";
-import { GRAMS, NUTRIENT_KEYS, SERVING, type FoodUnit, type Nutrition } from "@nutrisage/shared";
+import { GRAMS, NUTRIENT_KEYS, SERVING, amountMax, formatAmount, isAmount, isNewFoodUnit, type Amount, type FoodUnit, type Nutrition } from "@nutrisage/shared";
 import { UserError, invalid } from "./errors";
 
 export const ESTIMATE_LIMITS = {
@@ -40,6 +40,22 @@ export interface Estimate {
 export interface EstimateOptions {
   /** The food is a recipe ingredient: also ask for its Yield ratio. */
   ingredient?: boolean;
+  /** Estimate exactly this amount (e.g. 1 1/2 cup) instead of one typical serving (see readPortion). */
+  portion?: Amount;
+}
+
+/**
+ * The amount and unit picked in the add box for a new Food, checked: a unit the add box offers
+ * (NEW_FOOD_UNITS, other than serving) and a valid amount of it. Undefined when none was given or
+ * the unit is serving (one typical serving, scaled by the client). Only these checked values reach
+ * the prompt.
+ */
+export function readPortion(amount: unknown, unit: unknown): Amount | undefined {
+  if ((amount === undefined || amount === null) && (unit === undefined || unit === null)) return undefined;
+  if (!isNewFoodUnit(unit)) throw invalid("unit must be one of the units the add box offers");
+  if (unit === SERVING) return undefined;
+  if (!isAmount(amount, unit)) throw invalid(`amount must be more than 0 and at most ${amountMax(unit)}`);
+  return { amount, unit };
 }
 
 export type BedrockClient = Pick<BedrockRuntimeClient, "send">;
@@ -60,6 +76,9 @@ const SYSTEM = [
   "Also include units: an object of up to 4 other common units for this food mapped to the gram weight of ONE of that unit (for example {\"egg\": 50} or {\"cup\": 245, \"slice\": 28}); use {} when none fit.",
   "If truly unrecognizable, use 0 for all.",
 ].join(" ");
+
+const PORTION =
+  " If an Amount line follows the food, estimate exactly that amount of it: the nutrients and servingGrams are for that whole amount.";
 
 const YIELD =
   " This food is a recipe ingredient: also include yieldRatio, the ratio of its prepared (cooked) weight to its raw weight (for example dry rice 2.5, raw chicken breast 0.75, raw spinach 0.1, oil 1).";
@@ -145,9 +164,9 @@ export async function estimateFood(text: unknown, opts: EstimateOptions = {}): P
     out = await client.send(
       new ConverseCommand({
         modelId,
-        system: [{ text: SYSTEM + (opts.ingredient ? YIELD : "") }],
-        messages: [{ role: "user", content: [{ text: `<food>${name}</food>` }] }],
-        inferenceConfig: { maxTokens: 300, temperature: 0 },
+        system: [{ text: SYSTEM + (opts.portion ? PORTION : "") + (opts.ingredient ? YIELD : "") }],
+        messages: [{ role: "user", content: [{ text: `<food>${name}</food>${opts.portion ? `\nAmount: ${formatAmount(opts.portion.amount)} ${opts.portion.unit}` : ""}` }] }],
+        inferenceConfig: { maxTokens: 300 },
       }),
     );
   } catch (e) {

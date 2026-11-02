@@ -1,5 +1,5 @@
 // The Goals form's rules, kept pure so they're testable without a DOM.
-import { NUTRIENTS, type Goals } from "@nutrisage/shared";
+import { NUTRIENTS, readNumberBox, type Goals } from "@nutrisage/shared";
 
 export type GoalKey = keyof Goals;
 export type GoalsFormValues = Record<GoalKey, string>;
@@ -19,9 +19,8 @@ export function goalsToForm(goals: Goals): GoalsFormValues {
 export function readGoalsForm(values: GoalsFormValues): GoalsFormResult {
   const goals = {} as Goals;
   for (const f of GOAL_FIELDS) {
-    const raw = values[f.key].trim();
-    const v = raw === "" ? 0 : Number(raw);
-    if (!Number.isFinite(v) || v < 0) return { ok: false, error: `${f.label} goal must be a number, 0 or more` };
+    const v = readNumberBox(values[f.key], 0);
+    if (v === undefined) return { ok: false, error: `${f.label} goal must be a number, 0 or more` };
     if (f.key === "water" && !Number.isInteger(v)) return { ok: false, error: "Water goal must be a whole number of cups" };
     goals[f.key] = v;
   }

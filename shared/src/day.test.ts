@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MEALS, MEAL_LABELS, dateKey, entriesByMeal, isDateKey, moveEntry, shiftDate, dayLabel } from "./day";
+import { MEALS, MEAL_LABELS, dateKey, entriesByMeal, isDateKey, mergeDays, moveEntry, shiftDate, dayLabel, weightLabel, type Day, type Entry } from "./day";
 
 describe("Meals", () => {
   it("are Breakfast, Lunch, Dinner, Dessert, Snack, in display order", () => {
@@ -80,5 +80,51 @@ describe("Day navigation", () => {
     expect(dayLabel("2026-11-03", today)).toBe("Tomorrow");
     expect(dayLabel("2026-10-28", today)).toBe("Wed, Oct 28");
     expect(dayLabel("2025-12-25", today)).toBe("Thu, Dec 25, 2025");
+  });
+});
+
+describe("mergeDays (a Day changed here from an older copy, or none, meets the server's newer copy)", () => {
+  const n = { carbs: 0, protein: 0, fat: 0, fiber: 0, sodium: 0, iron: 0, calories: 100 };
+  const entry = (id: string, name: string) => ({ id, meal: "lunch" as const, name, nutrition: n });
+  const day = (entries: Entry[], water: number | null = null, weight: number | null = null): Day => ({ date: "2026-11-02", entries, water, weight });
+  const names = (d: Day) => d.entries.map((e) => e.name);
+
+  it("started here without the server's copy: keeps every Entry from both, the server's first", () => {
+    const server = day([entry("d1", "Desk almonds")], 3, 170);
+    const local = day([entry("p1", "Phone banana")]);
+    expect(mergeDays(local, server, undefined)).toMatchObject({ entries: [{ name: "Desk almonds" }, { name: "Phone banana" }], water: 3, weight: 170 });
+  });
+
+  it("from an older copy: adds what each side added, drops what each side deleted", () => {
+    const base = day([entry("a", "Toast"), entry("b", "Tea")]);
+    const server = day([entry("a", "Toast"), entry("d", "Desk almonds")]); // the desktop deleted Tea, added almonds
+    const local = day([entry("b", "Tea"), entry("p", "Phone pear")]); // the phone deleted Toast, added a pear
+    expect(names(mergeDays(local, server, base))).toEqual(["Desk almonds", "Phone pear"]);
+  });
+
+  it("an Entry changed on one side keeps that change", () => {
+    const base = day([entry("a", "Toast"), entry("b", "Tea")]);
+    const server = day([entry("a", "Toast, 2 slices"), entry("b", "Tea")]);
+    const local = day([entry("a", "Toast"), entry("b", "Green tea")]);
+    expect(names(mergeDays(local, server, base))).toEqual(["Toast, 2 slices", "Green tea"]);
+  });
+
+  it("water and weight: this device's value when it changed them, else the server's", () => {
+    const base = day([], 2, 170);
+    expect(mergeDays(day([], 4, 170), day([], 3, 171), base)).toMatchObject({ water: 4, weight: 171 });
+    expect(mergeDays(day([], null, 168.5), day([], 5, null), undefined)).toMatchObject({ water: 5, weight: 168.5 });
+  });
+
+  it("is the local copy as is when the server has no Day", () => {
+    const local = day([entry("p1", "Phone banana")], 2);
+    expect(mergeDays(local, undefined, undefined)).toEqual(local);
+  });
+});
+
+describe("weightLabel (the weight box names the Day shown)", () => {
+  it("says today's, yesterday's or the date", () => {
+    expect(weightLabel("2026-11-02", "2026-11-02")).toBe("Today's weight");
+    expect(weightLabel("2026-11-01", "2026-11-02")).toBe("Yesterday's weight");
+    expect(weightLabel("2026-10-28", "2026-11-02")).toBe("Weight on Wed, Oct 28");
   });
 });

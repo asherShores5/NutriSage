@@ -25,7 +25,7 @@ await c.check("logs 1 1/2 servings, then editing it to 1/3 rescales the totals",
   const entries = p.getByRole("region", { name: "Entries" });
   await expect(entries.getByText("2 eggs scrambled")).toBeVisible();
   await expect(calories(p)).toHaveText("273 cal");
-  await expect(entries.getByText("183 g")).toBeVisible();
+  await expect(entries.getByText("1 1/2 serving · 183 g")).toBeVisible(); // the row shows amount + unit, not only grams
   await expect(form.getByLabel("Amount")).toHaveValue("1");
   await expect.poll(() => sentEntry()).toMatchObject({ amount: 1.5, unit: "serving", grams: 183 });
 

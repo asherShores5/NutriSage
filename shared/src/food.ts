@@ -73,6 +73,26 @@ export function foodFromServing({ name, nutrition, servingGrams, units = [], yie
   };
 }
 
+/** Units the add box offers for a new Food (no Library Food picked). */
+export const NEW_FOOD_UNITS = [SERVING, GRAMS, "oz", "cup", "tbsp", "tsp", "slice", "piece"] as const;
+export const isNewFoodUnit = (u: unknown): u is (typeof NEW_FOOD_UNITS)[number] => (NEW_FOOD_UNITS as readonly unknown[]).includes(u);
+
+/**
+ * A new Food from an estimate Bedrock made for `portion` (e.g. 1 1/2 cup of rice: nutrition and
+ * servingGrams are for the whole amount), as the serving foodFromServing takes. In g the serving is
+ * the weighed amount; in any other unit one of it is the serving, and the Food gets that unit with
+ * Bedrock's grams, so logging the same amount gives back the estimate.
+ */
+export function portionedServing(est: ServingInput, portion: Amount): ServingInput {
+  if (portion.unit === GRAMS) return { ...est, servingGrams: portion.amount };
+  const per = portion.amount > 0 ? portion.amount : 1;
+  const nutrition = Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, num(est.nutrition[k]) / per])) as Nutrition;
+  const one = okGrams(est.servingGrams) ? Math.round((est.servingGrams / per) * 10) / 10 : null;
+  if (portion.unit === SERVING || one === null) return { ...est, nutrition, servingGrams: one };
+  const label = cleanLabel(portion.unit);
+  return { ...est, nutrition, servingGrams: one, units: [{ label, grams: one }, ...(est.units ?? []).filter((u) => cleanLabel(u.label) !== label)] };
+}
+
 /** Whether the Food's gram weights are real (it has a "g" unit). */
 export const isWeighed = (food: Pick<Food, "units">) => food.units.some((u) => u.label === GRAMS);
 

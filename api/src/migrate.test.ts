@@ -151,6 +151,17 @@ describe("migration edge cases", () => {
     expect(d.entries.map((e: any) => [e.name, e.amount ?? null])).toEqual([["water (×0)", null], ["rice (×500)", null]]);
   });
 
+  it("keeps nutrition exactly, even past the API's limits, and lists those Entries in the report", async () => {
+    const big = extra({ entries: [{ food: "party pizza", macros: { calories: 150000.5, sodium: 123456.7 }, meal: "dinner" }, { food: "tea", macros: { calories: 2.25 } }], updatedAt: "2026-09-10T20:00:00.000Z" });
+    const dry = await migrate([big], target(), { apply: false });
+    expect(dry.outliers).toEqual(["asher 2026-09-10 party pizza: sodium 123456.7, calories 150000.5"]);
+    expect(formatReport(dry)).toContain("Over the API's limits (written as they are): asher 2026-09-10 party pizza: sodium 123456.7, calories 150000.5");
+    await migrate([big], target(), { apply: true });
+    const [d] = (await h.call(asher, "days", { from: "2026-09-10", to: "2026-09-10" })) as any[];
+    expect(d.entries[0].nutrition).toMatchObject({ calories: 150000.5, sodium: 123456.7 });
+    expect(d.entries[1].nutrition.calories).toBe(2.25);
+  });
+
   it("skips rows it can't read, and counts them", async () => {
     const r = await migrate([{ pk: { S: "asher" }, sk: { S: "2026-09-11" }, data: { S: "{not json" } }], target(), { apply: false });
     expect(r.skipped).toEqual({ asher: 1 });

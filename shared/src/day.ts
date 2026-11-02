@@ -55,6 +55,33 @@ export interface Day {
   updatedAt?: number;
 }
 
+/**
+ * A Day changed on this device from `base` (the server's copy it started from, or undefined when it
+ * started without one, e.g. opened offline), merged with the server's copy as it is now, so neither
+ * device loses what it logged (spec: Offline). A three-way merge: Entries added on either side stay
+ * (the server's first); Entries deleted on either side go; an Entry changed on one side keeps that
+ * change (this device's when both changed it). Water and weight are this device's when it changed
+ * them, else the server's.
+ */
+export function mergeDays(local: Day, server: Day | undefined, base: Day | undefined): Day {
+  if (!server) return local;
+  const was = new Map((base?.entries ?? []).map((e) => [e.id, JSON.stringify(e)]));
+  const mine = new Map(local.entries.map((e) => [e.id, e]));
+  const onServer = new Set(server.entries.map((e) => e.id));
+  const changedHere = (e: Entry) => was.get(e.id) !== JSON.stringify(e);
+  const entries = [
+    ...server.entries.flatMap((s) => {
+      const l = mine.get(s.id);
+      if (!l) return was.has(s.id) ? [] : [s]; // deleted here, or new there
+      return [changedHere(l) ? l : s];
+    }),
+    // Here but not on the server: new here, or deleted there (kept only if changed here since).
+    ...local.entries.filter((l) => !onServer.has(l.id) && (!was.has(l.id) || changedHere(l))),
+  ];
+  const pick = <K extends "water" | "weight">(k: K) => ((local[k] ?? null) !== (base?.[k] ?? null) ? (local[k] ?? null) : (server[k] ?? null));
+  return { ...local, entries, water: pick("water"), weight: pick("weight"), updatedAt: server.updatedAt };
+}
+
 /** The Day's Entries grouped by Meal, in display order; Meals with no Entries are left out. */
 export function entriesByMeal(entries: readonly Entry[]): [Meal, Entry[]][] {
   return MEALS.map((m) => [m, entries.filter((e) => e.meal === m)] as [Meal, Entry[]]).filter(([, list]) => list.length > 0);
@@ -122,4 +149,10 @@ export function dayLabel(date: string, today: string): string {
   if (date === shiftDate(today, 1)) return "Tomorrow";
   const sameYear = date.slice(0, 4) === today.slice(0, 4);
   return utc(date).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+}
+
+/** The weight box's label for a Day: "Today's weight", "Yesterday's weight", else "Weight on Wed, Oct 28". */
+export function weightLabel(date: string, today: string): string {
+  const day = dayLabel(date, today);
+  return ["Today", "Yesterday", "Tomorrow"].includes(day) ? `${day}'s weight` : `Weight on ${day}`;
 }

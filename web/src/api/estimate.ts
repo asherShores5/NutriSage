@@ -1,5 +1,5 @@
 // Bedrock estimates (schema/estimate.graphql). A Guest uses the capped Guest endpoint instead.
-import type { Food, FoodUnit, Nutrition } from "@nutrisage/shared";
+import { portionedServing, type Amount, type Food, type FoodUnit, type Nutrition } from "@nutrisage/shared";
 import { guestEstimate } from "../guest/estimate";
 import { addGuestFood } from "../guest/store";
 import { isGuest } from "../session";
@@ -20,15 +20,18 @@ export interface Estimate {
 
 /**
  * Estimate one serving of `text`; it is saved to the Library too (a Guest's own, on this device).
- * `ingredient` (the Recipe builder) also asks for the Food's Yield ratio.
+ * `ingredient` (the Recipe builder) also asks for the Food's Yield ratio. `portion` (the add box,
+ * a new Food in a unit other than serving) estimates exactly that amount, and the Food gets that unit.
  */
-export async function estimate(text: string, opts: { ingredient?: boolean } = {}): Promise<Estimate> {
+export async function estimate(text: string, opts: { ingredient?: boolean; portion?: Amount } = {}): Promise<Estimate> {
   const ingredient = opts.ingredient === true;
+  const portion = opts.portion;
   if (isGuest()) {
-    const est = await guestEstimate(text, { ingredient });
+    const est = await guestEstimate(text, { ingredient, portion });
     const units = Array.isArray(est.units) ? est.units : [];
-    return { ...est, units, food: addGuestFood({ ...est, units }) };
+    const serving = { ...est, units };
+    return { ...serving, food: addGuestFood(portion ? portionedServing(serving, portion) : serving) };
   }
-  const q = `mutation($text: String!, $ingredient: Boolean) { estimate(text: $text, ingredient: $ingredient) { name nutrition { ${NUTRITION} } servingGrams yieldRatio units { label grams } food { ${FOOD} } } }`;
-  return (await gql<{ estimate: Estimate }>(q, { text, ...(ingredient ? { ingredient } : {}) })).estimate;
+  const q = `mutation($text: String!, $ingredient: Boolean, $amount: Float, $unit: String) { estimate(text: $text, ingredient: $ingredient, amount: $amount, unit: $unit) { name nutrition { ${NUTRITION} } servingGrams yieldRatio units { label grams } food { ${FOOD} } } }`;
+  return (await gql<{ estimate: Estimate }>(q, { text, ...(ingredient ? { ingredient } : {}), ...(portion ? portion : {}) })).estimate;
 }

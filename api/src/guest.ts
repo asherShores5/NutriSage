@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
-import { cleanFoodText, estimateFood } from "./estimate";
+import { cleanFoodText, estimateFood, readPortion } from "./estimate";
 import { UserError, invalid } from "./errors";
 
 export { setBedrockClient } from "./estimate";
@@ -107,7 +107,7 @@ function readBody(event: APIGatewayProxyEventV2): { body: Record<string, unknown
   return { reply: json(400, { error: "ValidationError", message: "Send a JSON object" }) };
 }
 
-/** POST /estimate {text, ingredient?} -> an Estimate. Everything else is 404. */
+/** POST /estimate {text, ingredient?, amount?, unit?} -> an Estimate. Everything else is 404. */
 export async function handler(event: APIGatewayProxyEventV2): Promise<Reply> {
   const { method, path, sourceIp } = event.requestContext.http;
   if (method !== "POST" || path !== "/estimate") return json(404, { error: "NotFound", message: "Not found" });
@@ -117,8 +117,9 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<Reply> {
   try {
     // Checked before counting, so an empty Food doesn't use one of the day's estimates.
     if (!cleanFoodText(body.text)) throw invalid("Type a Food to estimate");
+    const portion = readPortion(body.amount, body.unit);
     await takeEstimate(sourceIp, new Date(event.requestContext.timeEpoch));
-    return json(200, await estimateFood(body.text, { ingredient: body.ingredient === true }));
+    return json(200, await estimateFood(body.text, { ingredient: body.ingredient === true, portion }));
   } catch (e) {
     if (e instanceof LimitReached) return json(429, { error: "LimitReached", message: e.message });
     if (e instanceof UserError) return json(e.type === "Unavailable" ? 503 : 400, { error: e.type, message: e.message });

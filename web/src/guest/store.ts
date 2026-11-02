@@ -1,8 +1,8 @@
 // A Guest's data, in this browser's storage only (spec: Guest access). Nothing here talks to a
-// server. Shape: { days: { [date]: Day }, library: Food[], recipes: Recipe[], goals: Goals, favorites: Favorite[] }.
+// server. Shape: { days: { [date]: Day }, library: Food[], recipes: Recipe[], goals: Goals, favorites: Favorite[], mealWindows? }.
 import {
-  GUEST_CREATOR, NUTRIENT_KEYS, checkRecipe, nestingError, defaultGoals, editedFood, findFoodByName, foodFromServing, foodNameKey, guestSeed,
-  type Day, type Favorite, type Food, type FoodEdit, type Goals, type NewRecipe, type Recipe, type ServingInput,
+  DEFAULT_MEAL_WINDOWS, GUEST_CREATOR, NUTRIENT_KEYS, validateMealWindows, checkRecipe, nestingError, defaultGoals, editedFood, findFoodByName, foodFromServing, foodNameKey, guestSeed,
+  type Day, type Favorite, type Food, type FoodEdit, type Goals, type MealWindows, type NewRecipe, type Recipe, type ServingInput,
 } from "@nutrisage/shared";
 
 const KEY = "nutrisage.guest.data";
@@ -14,6 +14,8 @@ interface GuestData {
   recipes: Recipe[];
   goals: Goals;
   favorites: Favorite[];
+  /** Absent until the Guest changes them: the defaults. */
+  mealWindows?: MealWindows;
 }
 
 /** A stored Library item as a Food. Devices seeded before ticket 12 hold one serving's nutrition and no units. */
@@ -30,6 +32,7 @@ function read(): GuestData {
         days: d.days ?? {}, library: (Array.isArray(d.library) ? d.library : []).map(asFood),
         recipes: Array.isArray(d.recipes) ? d.recipes : [], goals: { ...defaultGoals(), ...d.goals },
         favorites: Array.isArray(d.favorites) ? d.favorites : [],
+        ...(d.mealWindows ? { mealWindows: d.mealWindows } : {}),
       };
     }
   } catch {
@@ -170,6 +173,21 @@ export function putGuestGoals(goals: Goals): Goals {
   data.goals = { ...goals };
   write(data);
   return data.goals;
+}
+
+/** The Guest's Meal windows, like the Member `mealWindows` query (the defaults until changed). */
+export function guestMealWindows(): MealWindows {
+  return { ...DEFAULT_MEAL_WINDOWS, ...read().mealWindows };
+}
+
+/** Replace the Guest's Meal windows, with the same checks as the Member `putMealWindows`. */
+export function putGuestMealWindows(windows: MealWindows): MealWindows {
+  const r = validateMealWindows(windows);
+  if (!r.ok) throw new Error(r.error);
+  const data = read();
+  data.mealWindows = r.windows;
+  write(data);
+  return { ...r.windows };
 }
 
 /** The Guest's Favorites, like the Member `favorites` query. */

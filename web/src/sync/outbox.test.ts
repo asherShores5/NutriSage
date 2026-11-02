@@ -70,6 +70,18 @@ describe("outbox", () => {
     expect(server.received.map((o) => o.type === "putDay" && o.day.water)).toEqual([3]);
   });
 
+  it("sends only the latest queued Meal windows, beside a queued Day", async () => {
+    const server = fakeServer();
+    const outbox = createOutbox({ ...memoryStorage(), send: server.send });
+    const w = { breakfast: "05:00", lunch: "11:00", dinner: "17:00", dessert: "20:00", snack: "21:00" };
+    await outbox.enqueue({ type: "putMealWindows", windows: w });
+    await outbox.enqueue({ type: "putDay", day: day("2026-11-02", 1) });
+    await outbox.enqueue({ type: "putMealWindows", windows: { ...w, lunch: "12:30" } });
+    server.online = true;
+    await outbox.flush();
+    expect(server.received.map((o) => (o.type === "putMealWindows" ? o.windows.lunch : o.type))).toEqual(["putDay", "12:30"]);
+  });
+
   it("a newer write made while the older one is in flight still goes out after it", async () => {
     const server = fakeServer();
     server.online = true;

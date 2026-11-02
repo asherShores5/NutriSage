@@ -24,7 +24,7 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
 
 ## Working rules
 
-- Commit locally; push only when Asher says so. Once deploy CI exists (ticket 11), pushes to `prod` deploy.
+- Commit locally; push only when Asher says so. Pushes to `prod` deploy (CI, after Asher approves the `production` environment).
 - Commit as `asher.shores5@gmail.com` (set in this repo's git config).
 - Live AWS changes (deploys, deleting data or DNS records) need Asher's explicit go each time.
 - Stack mirrors `../honeydo` and `../games-catalog` (TS workspaces shared/api/web/infra, CDK,
@@ -35,7 +35,7 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
 - `npm install` once (workspaces). `e2e/` is not a workspace: `cd e2e && npm install`.
 - `npm test`: vitest in shared, api, web and infra.
 - `npm run typecheck`: tsc in every workspace (web also checks the service worker).
-- `npm run build:web`: typecheck + Vite build to `web/dist` (needed by e2e and, from ticket 11, by synth).
+- `npm run build:web`: typecheck + Vite build to `web/dist` (needed by e2e and by synth).
 - `npm run synth`: `cdk synth` of every stack. Pin the region first:
   `AWS_REGION=us-west-1 AWS_DEFAULT_REGION=us-west-1 npm run synth` (the dev desktop sets
   AWS_REGION=us-west-2 globally). Synth needs no AWS credentials; with none it is env-agnostic.
@@ -52,20 +52,27 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   `schema/compose.ts` merges them into one document for AppSync and the e2e backend.
 - `api/src/`: `handler.ts` (Member allowlist, then dispatch by field name), `table.ts` (key layout,
   document client seam), `resolvers/<entity>.ts` (one `ResolverModule` per entity, merged in
-  `resolvers/index.ts`). Placeholders exist for favorites and library: fill the file, no index edit needed.
-- `infra/lib/`: `stacks.ts` (AppStack: table, Cognito, AppSync + Lambda), `app.ts` (wires stacks;
-  ticket 11 adds Cert/Web/Ci). An AppSync resolver is created for every Query/Mutation field in the
+  `resolvers/index.ts`).
+- `infra/lib/`: `stacks.ts` (AppStack: table, Cognito, AppSync + Lambda), `guest.ts` (Guest endpoint + cap
+  table), `hosting.ts` (CertStack, WebStack: S3 + CloudFront with the CSP from `csp.ts`), `ci.ts` (CiStack:
+  the GitHub OIDC deploy role), `app.ts` (wires them; Cert/Web/Ci only with hosting config). The API Lambda
+  gets explicit table actions (Get/Put/Update/Delete/Query): a resolver needing another one adds it in
+  `stacks.ts` (and `infra/test/stacks.test.ts`). An AppSync resolver is created for every Query/Mutation field in the
   composed schema, so a new field needs only its schema line and its resolver.
 - `web/src/`: `auth.ts` (Cognito JSON API), `config.ts` (runtime `/config.json`), `api/<entity>.ts`
   (GraphQL calls), `tabs.ts` (bottom tab registry), `components/` (shared by tabs, e.g. `Bars`), `views/<tab>/` (one folder per tab with its own
   components and CSS: today, week, trends, goals, profile). Today is split into `EntryForm` (add box),
   `EntryList` + `EntryEditor`, `Water`, `Weight`, and `components/Bars`; `views/goals/useGoals.ts` is the
-  goals hook both Today and Goals read. Both hooks sit on `sync/memberData.ts` (the Member's local copy in
-  localStorage, write-through via the pure outbox in `sync/outbox.ts`; reloads open Days and goals on
-  focus, visibility and `online`). `api/gql.ts` throws `NetworkError` for anything retryable. Theme: `src/theme.ts` + pre-paint `public/theme.js` (no inline scripts under the CSP). `sw/sw.ts` + `src/swShell.ts`: the
+  goals hook both Today and Goals read; `views/profile/useMealWindows.ts` likewise for Meal windows. These hooks
+  (and Favorites) sit on `sync/memberData.ts` (the Member's local copy in localStorage, write-through via the
+  pure outbox in `sync/outbox.ts`; reloads open Days, goals, Meal windows and Favorites on focus, visibility and
+  `online`). A Day changed while this device may be behind the server (opened offline, offline since it
+  loaded, or a write that had to wait) is three-way merged with the server's copy right before it's sent
+  (`mergeDays` in shared), so offline logging never wipes another device's Entries; otherwise last write wins. `api/gql.ts` throws `NetworkError` for anything retryable. Theme: `src/theme.ts` + pre-paint `public/theme.js` (no inline scripts under the CSP). `sw/sw.ts` + `src/swShell.ts`: the
   hand-rolled service worker built by `vite.config.ts`.
 - `e2e/`: Playwright against an in-process fake backend (`backend.ts`: the real handler on
-  `api/src/testing/fakeDynamo.ts`, fake Cognito), launcher `app.ts`, helpers `lib.ts`.
+  `api/src/testing/fakeDynamo.ts`, fake Cognito), launcher `app.ts`, helpers `lib.ts`. The app is served with
+  the deployed CSP (`infra/lib/csp.ts`); any CSP violation fails the run.
 - `api/src/migrate/`: the one-time migration from the old us-east-1 table (ticket 16). `migrate.ts` maps
   old rows to v1 items (deterministic ids, create-only writes, so re-runs change nothing); `cli.ts` is the
   script (dry run by default, `--apply` to write, target table from the `NutriSage` stack output). Tests in
@@ -124,8 +131,13 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   Member `estimate` mutation and the Guest endpoint; tests stub Bedrock via `testing/fakeBedrock.ts`.
 - **Guest mode** (ticket 10): `web/src/session.ts` holds the Guest flag; `web/src/api/*.ts` check
   `isGuest()` and answer from browser storage (`web/src/guest/store.ts`, seeded by `guestSeed` in
-  shared) or the Guest endpoint, so screens never branch on Guests. New api/ modules (goals,
-  Library, Favorites) must add the same branch; a Guest never sees the household Library.
+  shared) or the Guest endpoint, so screens never branch on Guests for data. Every api/ module
+  (Days, goals, Meal windows, Library, Recipes, Favorites, estimates) has that branch, and a new one must
+  too; a Guest never sees the household Library. Screens may check `isGuest()` only for Guest-specific
+  UI and wording, never to read or write data: the sign-in gate (`App.tsx`), the Guest banner
+  (`Shell.tsx`), the Guest Profile with Leave Guest mode, and copy that says where the data lives
+  (Profile and Library hints: "on this device" vs "you both share"). That's clearer than routing copy
+  through the session layer.
   The Guest endpoint is `api/src/guest.ts` behind its own public HTTP API (`infra/lib/guest.ts`,
   output `GuestEstimateUrl`, `guestEstimateUrl` in config.json). It must never import `table.ts`
   or `resolvers/`; its role has only Bedrock + UpdateItem on the Guest cap table. Caps
@@ -139,3 +151,19 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
 - Not testable in e2e: real device passkeys (Face ID, Keychain, phone QR), iOS install quirks. Service workers are blocked
   by default; `e2e/offline.ts` opts in (`open(user, { serviceWorkers: true })`) and uses `setOffline(page, on)`.
   Verify those on device after deploy.
+
+## Accepted deviations from the spec (decided; don't "fix" them)
+
+- Amounts in g go up to 5000 (other units 100), so a weighed plate fits.
+- Meal windows are start times (each Meal runs until the next starts), and the picked Meal resets to the
+  current window when the date rolls over while the app stays open.
+- Guest caps live in their own table (`infra/lib/guest.ts`), so the Guest Lambda has no grant on Member data.
+- Today has a Clear day button (asks first; keeps water and weight).
+- Quick Add (or any unit a Recipe lacks) logs a Recipe as 1/4 of the batch (`QUICK_ADD_PORTION`).
+- The estimate model is Sonnet 4.6 (`us.anthropic.claude-sonnet-4-6`), at the model's default temperature;
+  Sonnet 5.x isn't offered to the account yet.
+- A new Food estimated in a unit other than serving (g, oz, cup...) is estimated for exactly that amount, and
+  the Food gets that unit with Bedrock's grams (`portionedServing` in shared).
+- Migration: an old `(×N)` name suffix becomes an amount of N servings; nutrition is kept exactly, even past
+  the API's ceiling (reported, see the cutover runbook).
+

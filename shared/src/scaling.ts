@@ -1,7 +1,7 @@
 // Unit and gram scaling (spec: Domain model > Entry, Testing > unit and per-gram scaling). An
 // Entry's nutrition is a snapshot for its amount and unit; changing either rescales the snapshot.
 // Units convert through gram weights, so switching serving <-> g needs a known gram weight.
-import { amountMax, isAmount } from "./amount";
+import { amountMax, formatAmount, isAmount } from "./amount";
 import type { Entry, EntryIngredient } from "./day";
 import { NUTRIENT_KEYS, num, type Nutrition } from "./nutrients";
 
@@ -63,6 +63,14 @@ function scaled(snap: Snapshot, from: Amount, to: Amount, units: readonly Unit[]
 /** An Entry's amount and unit; a migrated Entry (none stored) is 1 serving of its snapshot. */
 export function entryAmount(e: Pick<Entry, "amount" | "unit">): Amount {
   return { amount: e.amount && e.amount > 0 ? e.amount : 1, unit: e.unit || SERVING };
+}
+
+/** What an Entry row says it holds: "1 1/2 serving · 183 g", "2 cup", "150 g" (grams rounded). */
+export function entryAmountLabel(e: Pick<Entry, "amount" | "unit" | "grams">): string {
+  const { amount, unit } = entryAmount(e);
+  if (unit === GRAMS) return `${Math.round(e.grams && e.grams > 0 ? e.grams : amount)} g`;
+  const grams = e.grams && e.grams > 0 ? ` · ${Math.round(e.grams)} g` : "";
+  return `${formatAmount(amount)} ${unit}${grams}`;
 }
 
 /** The units an Entry can be rescaled into: its own, plus g when its gram weight is known. */

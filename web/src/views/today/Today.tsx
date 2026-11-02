@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DEFAULT_WATER_GOAL, dateKey, moveEntry, sumMacros, type Entry, type EntryMove } from "@nutrisage/shared";
+import { DEFAULT_WATER_GOAL, dateKey, moveEntry, sumMacros, weightLabel, type Entry, type EntryMove } from "@nutrisage/shared";
 import { Bars } from "../../components/Bars";
 import { noteLogged } from "../../library/useFavorites";
 import { readDay, saveDay } from "../../sync/memberData";
@@ -81,7 +81,7 @@ export function Today() {
             </div>
           )}
           <Water cups={day.water ?? 0} goal={goals?.water ?? DEFAULT_WATER_GOAL} onChange={(water) => update((d) => ({ ...d, water }))} />
-          <Weight weight={day.weight ?? null} onChange={(weight) => update((d) => ({ ...d, weight }))} />
+          <Weight weight={day.weight ?? null} label={weightLabel(date, today)} onChange={(weight) => update((d) => ({ ...d, weight }))} />
         </>
       )}
     </div>

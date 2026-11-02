@@ -1,6 +1,6 @@
 // The Library edit form's boxes (text) to a FoodEdit and back, kept pure so it's testable without
 // a DOM. The rules on the numbers themselves are editedFood's (shared), which the API runs too.
-import { NUTRIENTS, foodEdit, type Food, type FoodEdit, type NutrientKey } from "@nutrisage/shared";
+import { NUTRIENTS, foodEdit, readNumberBox, type Food, type FoodEdit, type NutrientKey } from "@nutrisage/shared";
 
 export interface FoodFormValues {
   name: string;
@@ -27,12 +27,12 @@ export function foodToForm(food: Food): FoodFormValues {
   };
 }
 
-/** A box as a number, blank as `blank`, or NaN when it isn't a number. */
+/** A box as a number, blank as `blank`, or NaN when it isn't a number 0 or more. */
 function read(text: string, blank: number | null): number | null {
-  const t = text.trim();
-  return t === "" ? blank : Number(t);
+  const v = readNumberBox(text, blank);
+  return v === undefined ? NaN : v;
 }
-const bad = (v: number | null) => v !== null && !Number.isFinite(v);
+const bad = (v: number | null) => v !== null && Number.isNaN(v);
 
 export function readFoodForm(v: FoodFormValues): FoodFormResult {
   const nutrition = {} as FoodEdit["nutrition"];

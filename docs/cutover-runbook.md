@@ -66,14 +66,21 @@ Numbers creep up if the old app was used since. What to check:
   was saved in the new app already (e.g. while testing). The old Favorite points at that Food,
   so Food `create` drops by one for each. That's expected.
 - The script refuses to run (and writes nothing) if any planned Day or goals would fail the API's
-  own validation.
+  own validation, with one exception: nutrition is kept exactly as logged, never capped. An Entry
+  with a nutrient past the API's ceiling (100,000) is written as it is and listed on a line
+  `Over the API's limits (written as they are): ...`. The old table had none on 2026-11-02 (largest:
+  1,850 calories, 3,800 mg sodium). If one shows up, it's almost surely a typo: after the
+  migration, delete or re-log that Entry in the app, because the API refuses to save a Day that
+  still holds it.
 
 What the mapping does (spec: Migration and cutover):
 
 - Days keep each Entry's exact nutrition snapshot and Meal; a missing Meal becomes Snack. Old rows
   missing fiber, sodium or iron get 0. A `(×N)` suffix on a name becomes an amount of N servings
   (the snapshot is already for N) and leaves the name; a suffix that isn't a valid amount stays in
-  the name. Migrated Entries have no Library reference.
+  the name. (Accepted deviation from the spec, which says Entries move unchanged: the old app
+  baked the portion into the name, so reading it into an amount keeps the same totals and lets the
+  editor rescale it.) Migrated Entries have no Library reference.
 - Weight 0 or missing means not logged (null). Water null becomes 0 cups.
 - Goals carry over; the old `waterGoal` becomes the water goal (8 cups when there was none).
 - Old Favorites and the household quick-add meals become Foods, one per name (ignoring case),
@@ -166,20 +173,10 @@ delete the old icon and add the new site with Share > Add to Home Screen (deploy
 Notes:
 - Creating a repo with the old name ends GitHub's redirect from `github.com/asherShores5/NutriSageAI`
   to the renamed repo. That's why step 4 updates the git remotes first.
-- The stub repo has no workflows and no `production` environment; keep it that way. The deploy role
-  still trusts the old name's `production` subject, so a `production` environment in the stub could
-  deploy. Close that by removing the old name from the trust (same day, normal PR + prod deploy):
-
-  ```diff
-  --- a/infra/lib/ci.ts
-  -/** The repo's names: it's renamed from NutriSageAI to NutriSage at cutover (spec), so both are trusted. */
-  -export const GITHUB_REPO_NAMES = ["NutriSageAI", "NutriSage"];
-  +/** The repo's name (renamed from NutriSageAI at cutover; that name is now the Pages redirect stub). */
-  +export const GITHUB_REPO_NAMES = ["NutriSage"];
-  ```
-
-  Ship it after the rename (the deploy runs as `NutriSage`). `infra/test/hosting.test.ts` pins the
-  trusted subjects: drop its two `NutriSageAI` subject lines in the same change. Also update `gh api repos/asherShores5/NutriSageAI` to `.../NutriSage` in
+- The stub repo has no workflows and no `production` environment; keep it that way. It can't deploy
+  either way: the deploy role trusts the old name only in GitHub's ID form, pinned to the real
+  repo's ID (`infra/lib/ci.ts`), and the stub gets a new ID. Nothing to change in the role after the
+  rename. Do update `gh api repos/asherShores5/NutriSageAI` to `.../NutriSage` in
   `docs/deploy-runbook.md` step 1.
 
 ## 6. Point the App Connector Tile at the new NutriSage

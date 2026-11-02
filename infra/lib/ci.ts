@@ -2,10 +2,21 @@ import { CfnOutput, Duration, Stack, type StackProps, aws_iam as iam } from "aws
 import type { Construct } from "constructs";
 
 const GITHUB_OWNER = "asherShores5";
-/** asherShores5's immutable GitHub owner ID (public). GitHub's OIDC `sub` can embed owner@id/repo@id. */
+/** asherShores5's immutable GitHub owner ID (public). */
 const GITHUB_OWNER_ID = "71547146";
-/** The repo's names: it's renamed from NutriSageAI to NutriSage at cutover (spec), so both are trusted. */
+/**
+ * GitHub's OIDC `sub` for this owner's repos is the ID form, `repo:asherShores5@71547146/<name>@<repo id>:...`
+ * (seen in CloudTrail for Honey Do, Games Catalog and App Connector deploys, 2026-10-30 to 11-02; no repo
+ * setting needed). It still carries the name, so both names are trusted in that form: before the
+ * rename the repo is NutriSageAI, after it NutriSage, and the repo ID pins it to this repo either way
+ * (the NutriSageAI Pages stub created at cutover gets a new ID).
+ */
 export const GITHUB_REPO_NAMES = ["NutriSageAI", "NutriSage"];
+/**
+ * The name-only form is trusted for the new name only, in case GitHub sends it. Never the old name:
+ * after cutover any repo called NutriSageAI (the stub) would match it.
+ */
+export const GITHUB_REPO_NAME = "NutriSage";
 export const DEPLOY_BRANCH = "prod";
 /** GitHub Environment the deploy job runs in: prod branch only, Asher as required reviewer (set in GitHub). */
 export const DEPLOY_ENVIRONMENT = "production";
@@ -34,10 +45,10 @@ export class CiStack extends Stack {
       "GitHub",
       `arn:aws:iam::${this.account}:oidc-provider/token.actions.githubusercontent.com`,
     );
-    const subjects = GITHUB_REPO_NAMES.flatMap((repo) => [
-      `repo:${GITHUB_OWNER}/${repo}:environment:${DEPLOY_ENVIRONMENT}`,
-      `repo:${GITHUB_OWNER}@${GITHUB_OWNER_ID}/${repo}@${githubRepoId}:environment:${DEPLOY_ENVIRONMENT}`,
-    ]);
+    const subjects = [
+      ...GITHUB_REPO_NAMES.map((repo) => `repo:${GITHUB_OWNER}@${GITHUB_OWNER_ID}/${repo}@${githubRepoId}:environment:${DEPLOY_ENVIRONMENT}`),
+      `repo:${GITHUB_OWNER}/${GITHUB_REPO_NAME}:environment:${DEPLOY_ENVIRONMENT}`,
+    ];
 
     const role = new iam.Role(this, "DeployRole", {
       roleName: DEPLOY_ROLE_NAME,

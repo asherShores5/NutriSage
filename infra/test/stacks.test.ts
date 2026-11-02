@@ -28,6 +28,18 @@ describe("data", () => {
       }),
     });
   });
+
+  it("the API Lambda gets only the table actions the resolvers use, on the Member table only", () => {
+    const [roleId] = Object.keys(app.findResources("AWS::IAM::Role")).filter((id) => id.startsWith("ApiFn"));
+    const statements = Object.values(app.findResources("AWS::IAM::Policy"))
+      .filter((p: any) => JSON.stringify(p.Properties.Roles).includes(roleId))
+      .flatMap((p: any) => p.Properties.PolicyDocument.Statement)
+      .filter((st: any) => [st.Action].flat().some((a: string) => a.startsWith("dynamodb:")));
+    expect(statements).toHaveLength(1);
+    expect([statements[0].Action].flat().sort()).toEqual(["dynamodb:DeleteItem", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:UpdateItem"]);
+    const [tableId] = Object.keys(app.findResources("AWS::DynamoDB::GlobalTable")).filter((id) => id.startsWith("Table"));
+    expect(statements[0].Resource).toEqual({ "Fn::GetAtt": [tableId, "Arn"] });
+  });
 });
 
 describe("auth", () => {

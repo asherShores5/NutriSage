@@ -148,8 +148,17 @@ site checks fail right after the deploy.
    only in the deploy job).
 
 CI gets the repo ID from GitHub (`GITHUB_REPOSITORY_ID`), so the role's trust policy stays the same
-as the first deploy's. The role trusts both repo names (NutriSageAI now, NutriSage after the
-rename) and the ID form, so the rename at cutover doesn't break deploys.
+as the first deploy's. GitHub's OIDC subject for this owner is the ID form
+(`repo:asherShores5@71547146/<name>@<repo id>:environment:production`; CloudTrail shows it for the
+other apps' deploys, no repo setting needed). The role trusts that form for both names (NutriSageAI
+now, NutriSage after the rename), pinned to this repo's ID, plus the name-only form for NutriSage
+only. So the first deploy (still named NutriSageAI) and every deploy after the rename work, and the
+NutriSageAI stub repo created at cutover (a new ID) can never assume the role.
+
+If the first deploy's `configure-aws-credentials` step fails with "Not authorized to perform
+sts:AssumeRoleWithWebIdentity", GitHub sent a different subject. Find it in CloudTrail
+(`aws cloudtrail lookup-events --region us-west-1 --lookup-attributes AttributeKey=EventName,AttributeValue=AssumeRoleWithWebIdentity`,
+`userIdentity.userName` of the failed event) and stop: don't add the old name's name-only form back.
 
 ## 7. Create the Members (only after step 5 passes)
 
@@ -168,7 +177,7 @@ Passkeys can't be automated, so this is the real test of sign-in:
 
 1. Safari: open https://nutrisage.ashershores.com. Sign in with the username and one-time password
    (switch the sign-in form to password).
-2. Profile tab > Passkeys > Add a passkey > Face ID. The count shows "1 passkey on your account."
+2. Profile tab > Passkeys > Add a passkey > Face ID. The count shows "1 passkey saved for you."
 3. Profile > Sign out. Sign in again with "Sign in with passkey": Face ID, no password.
 4. Share > Add to Home Screen. Open NutriSage from the home screen and sign in with the passkey there
    too (the installed app is its own browser context on iOS).

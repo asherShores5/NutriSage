@@ -1,7 +1,7 @@
 // Ticket 02: type a Food on Today and log Bedrock's estimate (Bedrock is stubbed in backend.ts).
 import { expect } from "playwright/test";
 import { launch } from "./app";
-import { bedrock } from "./backend";
+import { bedrock, graphql } from "./backend";
 import { checklist, lastCall } from "./lib";
 
 const app = await launch();
@@ -25,6 +25,26 @@ await c.check("typing a Food and pressing Enter logs an estimated Entry with its
   await expect(form.getByLabel("Food")).toHaveValue("");
   await expect.poll(() => (lastCall("putDay")?.args as any)?.input?.entries?.[0]?.grams).toBe(122);
   if ((lastCall("estimate")?.args as any)?.text !== "2 eggs scrambled") throw new Error("estimate not called with the typed text");
+  await p.context().close();
+});
+
+await c.check("a new Food in cups: Bedrock estimates 1 1/2 cup, the Entry reads 1 1/2 cup and the Library Food gets a cup unit", async () => {
+  const p = await app.open("asher");
+  c.watch(p);
+  bedrock.reply(JSON.stringify({ carbs: 67.5, protein: 6, fat: 0.6, fiber: 0.9, sodium: 3, iron: 0.6, calories: 307.5, servingGrams: 237 }));
+  const form = p.getByRole("form", { name: "Add an Entry" });
+  await expect(form.getByLabel("Unit").locator("option")).toHaveText(["serving", "g", "oz", "cup", "tbsp", "tsp", "slice", "piece"]);
+  await form.getByLabel("Food").fill("jasmine rice");
+  await form.getByLabel("Unit").selectOption("cup");
+  await form.getByLabel("Amount").fill("1 1/2");
+  await form.getByRole("button", { name: "Estimate" }).click();
+  await expect(p.getByRole("region", { name: "Entries" }).getByText("jasmine rice")).toBeVisible();
+  const args = lastCall("estimate")?.args as any;
+  if (args?.amount !== 1.5 || args?.unit !== "cup") throw new Error(`estimate asked for ${JSON.stringify(args)}`);
+  await expect.poll(() => (lastCall("putDay")?.args as any)?.input?.entries?.at(-1)).toMatchObject({ name: "jasmine rice", amount: 1.5, unit: "cup", grams: 237, nutrition: { calories: 307.5 } });
+  const lib = await graphql("fake-id.asher", `query { library { foods { name units { label grams } } } }`);
+  const rice = lib.data.library.foods.find((f: any) => f.name === "jasmine rice");
+  if (!rice?.units.some((u: any) => u.label === "cup" && u.grams === 158)) throw new Error(`Library units ${JSON.stringify(rice?.units)}`);
   await p.context().close();
 });
 

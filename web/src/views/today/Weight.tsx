@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { readWeight } from "./waterWeight";
 
-/** Today's one weigh-in: save a weight, or clear it. */
-export function Weight({ weight, onChange }: { weight: number | null; onChange: (weight: number | null) => void }) {
+/** The Day's one weigh-in: save a weight, or clear it. `label` names the Day ("Today's weight", "Yesterday's weight", "Weight on Wed, Oct 28"). */
+export function Weight({ weight, label, onChange }: { weight: number | null; label: string; onChange: (weight: number | null) => void }) {
   const [text, setText] = useState(weight ? String(weight) : "");
   const [error, setError] = useState<string>();
   useEffect(() => setText(weight ? String(weight) : ""), [weight]);
@@ -22,7 +22,7 @@ export function Weight({ weight, onChange }: { weight: number | null; onChange: 
         <span className="weight-current">{weight ? weight : "Not logged"}</span>
       </div>
       <form className="row" onSubmit={save}>
-        <input inputMode="decimal" aria-label="Today's weight" placeholder="Today's weight" value={text} onChange={(e) => setText(e.target.value)} />
+        <input inputMode="decimal" aria-label={label} placeholder={label} value={text} onChange={(e) => setText(e.target.value)} />
         <button className="primary">Save</button>
         {weight ? <button type="button" onClick={() => { setError(undefined); onChange(null); }}>Clear</button> : null}
       </form>

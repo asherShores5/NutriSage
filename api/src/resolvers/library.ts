@@ -11,7 +11,7 @@
 // (putFood) is never overwritten by a suggestion.
 import { GetCommand, PutCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import {
-  NUTRIENT_KEYS, checkRecipe, editedFood, nestingError, findFoodByName, foodFromServing, foodNameKey, type Food, type FoodEdit, type NewRecipe, type Recipe,
+  NUTRIENT_KEYS, checkRecipe, portionedServing, type Amount, type ServingInput, editedFood, nestingError, findFoodByName, foodFromServing, foodNameKey, type Food, type FoodEdit, type NewRecipe, type Recipe,
 } from "@nutrisage/shared";
 import { UserError, invalid } from "../errors";
 import { estimateFood, type Estimate } from "../estimate";
@@ -49,19 +49,21 @@ export const listRecipes = async (): Promise<Recipe[]> =>
 
 /**
  * Save an estimate as a Library Food, per gram with its units, unless a Food with the same name
- * (ignoring case and spacing) is already there: then that Food is returned unchanged. Returns null,
+ * (ignoring case and spacing) is already there: then that Food is returned unchanged. An estimate
+ * made for `portion` (an amount in a unit) gets that unit (portionedServing in shared). Returns null,
  * saving nothing, for an all-zero (unrecognized) estimate or when the Library is full.
  * Two Members estimating the same new name at the same instant could both save it; harmless and rare.
  */
-export async function addEstimatedFood(username: string, est: Estimate): Promise<Food | null> {
+export async function addEstimatedFood(username: string, est: Estimate, portion?: Amount): Promise<Food | null> {
   if (NUTRIENT_KEYS.every((k) => !est.nutrition[k])) return null;
   const foods = await listFoods();
   const existing = findFoodByName(foods, est.name);
   if (existing) return est.yieldRatio ? fillYieldRatio(existing, est.yieldRatio) : existing;
   if (foods.length >= LIBRARY_LIMITS.foods) return null;
+  const serving: ServingInput = { name: est.name, nutrition: est.nutrition, servingGrams: est.servingGrams, units: est.units, yieldRatio: est.yieldRatio };
   const food: Food = {
     id: crypto.randomUUID(),
-    ...foodFromServing({ name: est.name, nutrition: est.nutrition, servingGrams: est.servingGrams, units: est.units, yieldRatio: est.yieldRatio }),
+    ...foodFromServing(portion ? portionedServing(serving, portion) : serving),
     createdBy: username,
     updatedAt: Date.now(),
   };

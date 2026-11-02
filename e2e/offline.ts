@@ -3,6 +3,7 @@
 // offline; a change on one device shows on another when that one comes back to the front.
 import { expect } from "playwright/test";
 import { launch, setOffline, todayKey, type Page } from "./app";
+import { shiftDate } from "../shared/src/day";
 import { db, graphql } from "./backend";
 import { checklist } from "./lib";
 
@@ -17,6 +18,7 @@ async function backendEntries(user: string, date = todayKey()): Promise<string[]
 
 async function logByHand(p: Page, food: string, calories: string) {
   const form = p.getByRole("form", { name: "Add an Entry" });
+  await expect(form.getByLabel("Food")).toBeVisible();
   const byHand = form.getByRole("button", { name: "Type nutrition by hand" });
   if (await byHand.isVisible()) await byHand.click(); // the form stays in hand mode after an Entry
   await form.getByLabel("Food").fill(food);
@@ -86,6 +88,52 @@ await c.check("a change on the phone shows on the desktop when it comes back to 
   await logByHand(desktop, "Desk almonds", "160");
   await expect.poll(() => backendEntries("asher")).toEqual(["Phone banana", "Desk almonds"]);
   await phone.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await expect(entries(phone).getByText("Desk almonds")).toBeVisible();
+  await phone.context().close();
+  await desktop.context().close();
+});
+
+await c.check("a Day first opened offline on the phone keeps the desktop's Entries when it syncs", async () => {
+  db.reset();
+  const yesterday = shiftDate(todayKey(), -1);
+  const desktop = await app.open("asher", { device: "desktop" });
+  await desktop.getByRole("button", { name: "Previous Day" }).click();
+  await logByHand(desktop, "Desk almonds", "160");
+  await expect.poll(() => backendEntries("asher", yesterday)).toEqual(["Desk almonds"]);
+  const phone = await app.open("asher");
+  c.watch(phone);
+  await expect(phone.getByText("Nothing logged yet today.")).toBeVisible();
+  await setOffline(phone, true);
+  await phone.getByRole("button", { name: "Previous Day" }).click(); // never loaded on this phone
+  await logByHand(phone, "Phone banana", "105");
+  await setOffline(phone, false);
+  await phone.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect.poll(() => backendEntries("asher", yesterday)).toEqual(["Desk almonds", "Phone banana"]);
+  await expect(entries(phone).getByText("Desk almonds")).toBeVisible();
+  await expect(entries(phone).getByText("Phone banana")).toBeVisible();
+  await phone.context().close();
+  await desktop.context().close();
+});
+
+await c.check("an older copy on the phone, changed offline, keeps what the desktop logged meanwhile (and the phone's delete)", async () => {
+  db.reset();
+  const phone = await app.open("asher");
+  const desktop = await app.open("asher", { device: "desktop" });
+  c.watch(phone);
+  await logByHand(phone, "Phone toast", "80");
+  await expect.poll(() => backendEntries("asher")).toEqual(["Phone toast"]);
+  await setOffline(phone, true);
+  await desktop.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(entries(desktop).getByText("Phone toast")).toBeVisible();
+  await logByHand(desktop, "Desk almonds", "160");
+  await expect.poll(() => backendEntries("asher")).toEqual(["Phone toast", "Desk almonds"]);
+  await logByHand(phone, "Phone pear", "60");
+  await entries(phone).getByRole("button", { name: /^Phone toast/ }).click();
+  await entries(phone).getByRole("button", { name: "Delete" }).click();
+  await expect(entries(phone).getByText("Phone toast")).toHaveCount(0);
+  await setOffline(phone, false);
+  await phone.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect.poll(() => backendEntries("asher")).toEqual(["Desk almonds", "Phone pear"]);
   await expect(entries(phone).getByText("Desk almonds")).toBeVisible();
   await phone.context().close();
   await desktop.context().close();

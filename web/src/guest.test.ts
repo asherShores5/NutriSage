@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dateKey, foodEdit } from "@nutrisage/shared";
+import { DEFAULT_MEAL_WINDOWS, dateKey, foodEdit } from "@nutrisage/shared";
 
 // Guest mode at the data/session layer: the same api/days and api/estimate functions Today uses,
 // answered from browser storage (Days) and the Guest estimate endpoint (estimates) for a Guest.
@@ -38,6 +38,7 @@ async function launch() {
     recipes: await import("./api/recipes"),
     store: await import("./guest/store"),
     favorites: await import("./api/favorites"),
+    mealWindows: await import("./api/mealWindows"),
   };
 }
 
@@ -100,6 +101,16 @@ describe("a Guest", () => {
     expect(requests).toEqual([]);
   });
 
+  it("has the default Meal windows and keeps the ones they set, on this device only", async () => {
+    const { session, mealWindows } = await launch();
+    session.enterGuest();
+    expect(await mealWindows.getMealWindows()).toEqual(DEFAULT_MEAL_WINDOWS);
+    await mealWindows.putMealWindows({ ...DEFAULT_MEAL_WINDOWS, lunch: "12:30" });
+    const again = await launch();
+    expect((await again.mealWindows.getMealWindows()).lunch).toBe("12:30");
+    expect(requests).toEqual([]);
+  });
+
   it("keeps Favorites on this device only: star, bump, unstar, across a relaunch", async () => {
     const { session, favorites, library } = await launch();
     session.enterGuest();
@@ -143,6 +154,15 @@ describe("a Guest", () => {
     const r = await estimate.estimate("apple");
     expect(r.servingGrams).toBe(182);
     expect(requests).toEqual([{ url: "https://guest.example/estimate", body: { text: "apple" } }]);
+  });
+
+  it("estimates an amount in a picked unit through the Guest endpoint; the device Food gets that unit", async () => {
+    const { session, estimate } = await launch();
+    session.enterGuest();
+    guestReply = { status: 200, body: { name: "rice", nutrition: { carbs: 67.5, protein: 6, fat: 0.6, fiber: 0.9, sodium: 3, iron: 0.6, calories: 307.5 }, servingGrams: 237, yieldRatio: null, units: [] } };
+    const r = await estimate.estimate("rice", { portion: { amount: 1.5, unit: "cup" } });
+    expect(requests).toEqual([{ url: "https://guest.example/estimate", body: { text: "rice", amount: 1.5, unit: "cup" } }]);
+    expect(r.food?.units).toContainEqual({ label: "cup", grams: 158 });
   });
 
   it("has the demo Library as Foods per gram, from this device only", async () => {

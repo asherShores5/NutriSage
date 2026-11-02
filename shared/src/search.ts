@@ -15,6 +15,12 @@ export interface SearchHit<T extends Searchable> {
   score: number;
   /** The text is the item's whole name (case, spacing, punctuation and a typo in a long word aside). */
   whole: boolean;
+  /**
+   * The text covers the name: every word of the name is matched by a typed word and every typed
+   * word by a word of the name (partial words and typos allowed; a typed count is the amount, a number in the name must be typed). "chik brst" covers
+   * Chicken breast; "apple" doesn't cover Apple pie, nor "chicken breast sandwich" Chicken breast.
+   */
+  covers: boolean;
 }
 
 export interface SearchOptions {
@@ -82,6 +88,16 @@ function wordScore(q: string, w: string): number {
 
 const isCount = (w: string) => /^[0-9]+$/.test(w);
 
+/** Whether the typed words cover the name's words, both ways (see SearchHit.covers). */
+function coversName(query: string[], name: string[]): boolean {
+  // A typed count ("2 chik brst") is the amount; a number in the name is part of the name.
+  const q = query.filter((w) => !isCount(w));
+  const n = name.filter((w) => !isCount(w));
+  if (!q.length || !n.length) return false;
+  if (name.some((w) => isCount(w) && !query.includes(w))) return false;
+  return n.every((w) => q.some((x) => wordScore(x, w) > 0)) && q.every((x) => n.some((w) => wordScore(x, w) > 0));
+}
+
 /**
  * How well the query matches a name, 0..1: the average over typed words. A typed count ("2" in
  * "2 bananas") is usually the amount, not the name, so it only nudges the order when it matches.
@@ -109,10 +125,18 @@ export function searchLibrary<T extends Searchable>(library: readonly T[], query
   return library
     .map((item) => {
       const name = words(item.name);
-      return { item, score: nameScore(q, name), whole: wholeName(q, name), size: name.length };
+      return { item, score: nameScore(q, name), whole: wholeName(q, name), covers: coversName(q, name), size: name.length };
     })
     .filter((h) => h.score >= MIN_SEARCH_SCORE)
     .sort((a, b) => fav(b) - fav(a) || +b.whole - +a.whole || b.score - a.score || a.size - b.size || a.item.name.localeCompare(b.item.name))
     .slice(0, limit)
-    .map(({ item, score, whole }) => ({ item, score, whole }));
+    .map(({ item, score, whole, covers }) => ({ item, score, whole, covers }));
+}
+
+/**
+ * What Enter logs in the add box: the best match whose name the text covers (SearchHit.covers),
+ * else nothing, so Enter estimates the text as a new Food.
+ */
+export function enterMatch<T extends Searchable>(hits: readonly SearchHit<T>[]): T | undefined {
+  return hits.find((h) => h.covers)?.item;
 }

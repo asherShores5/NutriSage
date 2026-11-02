@@ -96,7 +96,9 @@ export class AppStack extends Stack {
       bundling: { minify: true, sourceMap: true, format: nodejs.OutputFormat.ESM, target: "node22" },
       logGroup: new logs.LogGroup(this, "ApiLogs", { retention: logs.RetentionDays.TWO_WEEKS, removalPolicy: RemovalPolicy.DESTROY }),
     });
-    table.grantReadWriteData(fn);
+    // Only what the resolvers send (Get/Put/Update/Delete/Query; deleteFood's transaction is Deletes),
+    // not grantReadWriteData's Scan, Batch* and the rest.
+    table.grant(fn, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:Query");
     allowEstimates(fn);
 
     const sdl = composeSchemaDir();

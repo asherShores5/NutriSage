@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import {
-  MEALS, MEAL_LABELS, NUTRIENTS, QUICK_ADD_PORTION, SERVING, formatAmount, isRecipe, logLibraryItem, parseAmount, recipeUnits, searchLibrary,
+  MEALS, MEAL_LABELS, NUTRIENTS, QUICK_ADD_PORTION, SERVING, formatAmount, enterMatch, isRecipe, logLibraryItem, parseAmount, recipeUnits, searchLibrary,
   type Amount, type Entry, type LibraryItem, type Meal,
 } from "@nutrisage/shared";
 import { estimate } from "../../api/estimate";
@@ -18,10 +18,12 @@ const plain = (e: unknown) => String((e as Error)?.message ?? e).replace(/^(Vali
 /**
  * Type a Food into a Meal with an amount and unit. Typing shows live fuzzy matches from the Library
  * (ticket 13; a Guest's own device Library): tapping one logs it at the amount, in the picked unit
- * when it has it, else servings (no Bedrock call). The match whose whole name was typed, or one
- * chosen with the arrow keys, is "picked": the unit picker offers its units and Enter logs it.
+ * when it has it, else servings (no Bedrock call). The best match whose name the text covers
+ * (enterMatch in shared: "chik brst" is Chicken breast, "apple" isn't Apple pie), or one chosen with
+ * the arrow keys, is "picked": the unit picker offers its units and Enter logs it.
  * With nothing picked, Enter (or Estimate) asks Bedrock for one serving's nutrition, saves it to the
- * Library and logs it scaled to the amount. "Type nutrition by hand" switches to typing one
+ * Library and logs it scaled to the amount; in another of the common units (g, oz, cup...) Bedrock
+ * estimates exactly the amount typed and the new Food gets that unit. "Type nutrition by hand" switches to typing one
  * serving's numbers yourself (servings only, no gram weight). "Build a Recipe" opens the Recipe
  * builder (ticket 17) on its own screen; what it logs comes back through `onAdd`.
  * Saved Recipes are matches too (ticket 19): one logs in a fraction of the batch or g as picked,
@@ -44,7 +46,7 @@ export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void
   const hits = useMemo(() => (byHand ? [] : searchLibrary(items, name, { favoriteIds })), [items, name, byHand, favoriteIds]);
   /** A match chosen with the arrow keys (null: none, by Escape), only for the text it was chosen on. */
   const [cursor, setCursor] = useState<{ name: string; id: string | null }>();
-  const pickedId = cursor?.name === name ? cursor.id : (hits.find((h) => h.whole)?.item.id ?? null);
+  const pickedId = cursor?.name === name ? cursor.id : (enterMatch(hits)?.id ?? null);
   const known = hits.find((h) => h.item.id === pickedId)?.item;
   const units = formUnits(known, byHand);
   const listId = useId();
@@ -110,9 +112,12 @@ export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void
     setBusy(true);
     setError(undefined);
     try {
-      const est = await estimate(name);
+      // In a unit other than serving, Bedrock estimates exactly that amount (and the new Food gets the unit).
+      const to = { amount: a.amount, unit: shownUnit };
+      const asked = shownUnit === SERVING ? undefined : to;
+      const est = await estimate(name, { portion: asked });
       if (est.food) rememberFood(est.food);
-      const r = entryFromEstimate(est, meal, { amount: a.amount, unit: shownUnit });
+      const r = entryFromEstimate(est, meal, to, asked);
       if (!r.ok) return setError(r.error);
       onAdd(r.entry);
       setName("");
