@@ -1,0 +1,29 @@
+# Root types. Each entity file adds its fields with `extend type Query/Mutation` (see compose.ts).
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Query
+type Mutation
+
+"Amounts of every tracked nutrient (shared/src/nutrients.ts). Grams, except sodium and iron (mg) and calories."
+type Nutrition {
+  carbs: Float!
+  protein: Float!
+  fat: Float!
+  fiber: Float!
+  sodium: Float!
+  iron: Float!
+  calories: Float!
+}
+
+input NutritionInput {
+  carbs: Float!
+  protein: Float!
+  fat: Float!
+  fiber: Float!
+  sodium: Float!
+  iron: Float!
+  calories: Float!
+}

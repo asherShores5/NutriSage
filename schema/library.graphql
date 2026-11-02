@@ -1,0 +1,2 @@
+# The shared Library: Foods and Recipes (tickets 12, 15, 19). Resolvers: api/src/resolvers/library.ts.
+# Placeholder: add types here and fields with `extend type Query { ... }` / `extend type Mutation { ... }`.
