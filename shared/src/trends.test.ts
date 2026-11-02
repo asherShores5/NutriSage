@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TREND_METRICS, defaultYMode, trendBounds, trendSegments, trendSeries, trendSummary } from "./trends";
+import { TREND_METRICS, defaultYMode, trendBounds, trendGoal, trendSegments, trendSeries, trendSummary } from "./trends";
 
 const e = (carbs: number, calories: number) => ({ nutrition: { carbs, calories } });
 
@@ -66,10 +66,50 @@ describe("trendBounds", () => {
     expect(trendBounds(pts(null, null), "fit")).toEqual({ min: 0, max: 1 });
   });
 
+  it("manual mode uses the Member's min and max as given, even when points fall outside", () => {
+    expect(trendBounds(pts(100, null, 250), "manual", { manual: { min: 150, max: 200 } })).toEqual({ min: 150, max: 200 });
+  });
+
+  it("manual mode with a blank side keeps the zero-mode bound for that side", () => {
+    expect(trendBounds(pts(100, null, 250), "manual", { manual: { min: 150, max: null } })).toEqual({ min: 150, max: 250 });
+    expect(trendBounds(pts(100, null, 250), "manual", { manual: { min: null, max: 300 } })).toEqual({ min: 0, max: 300 });
+  });
+
+  it("manual mode ignores a min that isn't below the max (falls back to zero mode)", () => {
+    expect(trendBounds(pts(100, null, 250), "manual", { manual: { min: 200, max: 200 } })).toEqual({ min: 0, max: 250 });
+    expect(trendBounds(pts(100, null, 250), "manual", { manual: { min: 300, max: null } })).toEqual({ min: 0, max: 250 });
+  });
+
   it("weight defaults to fit, everything else to zero", () => {
     expect(defaultYMode("weight")).toBe("fit");
     expect(defaultYMode("calories")).toBe("zero");
     expect(defaultYMode("water")).toBe("zero");
+  });
+});
+
+describe("goal line", () => {
+  const goals = { carbs: 200, protein: 0, fat: 60, fiber: 30, sodium: 2300, iron: 10, calories: 2000, water: 8 };
+
+  it("is the Member's goal for a nutrient, and the water goal for water", () => {
+    expect(trendGoal(goals, "calories")).toBe(2000);
+    expect(trendGoal(goals, "water")).toBe(8);
+  });
+
+  it("has none for weight (no weight goal), a goal of 0 (no goal), or before goals load", () => {
+    expect(trendGoal(goals, "weight")).toBeNull();
+    expect(trendGoal(goals, "protein")).toBeNull();
+    expect(trendGoal(undefined, "calories")).toBeNull();
+  });
+
+  it("stays on screen in zero and fit mode: the bounds stretch to reach it", () => {
+    expect(trendBounds(pts(1500, null, 1800), "zero", { goal: 2000 })).toEqual({ min: 0, max: 2000 });
+    expect(trendBounds(pts(1500, null, 1800), "fit", { goal: 1200 })).toEqual({ min: 1200, max: 1800 });
+    expect(trendBounds(pts(1500, null, 1800), "fit", { goal: 1600 })).toEqual({ min: 1500, max: 1800 });
+    expect(trendBounds(pts(null, null), "zero", { goal: 8 })).toEqual({ min: 0, max: 8 });
+  });
+
+  it("doesn't move manual bounds (the line is drawn only when it falls inside them)", () => {
+    expect(trendBounds(pts(1500, 1800), "manual", { goal: 2000, manual: { min: 1400, max: 1900 } })).toEqual({ min: 1400, max: 1900 });
   });
 });
 

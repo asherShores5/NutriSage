@@ -4,6 +4,7 @@
 // via TrendOptions (21), manual Y bounds and a goal line via YMode/trendBounds (22), and a second
 // series with its own bounds (23: call trendSeries/trendSegments/trendBounds again per series).
 import type { Day } from "./day";
+import type { Goals } from "./goals";
 import { NUTRIENTS, num, sumMacros, type NutrientKey } from "./nutrients";
 import { datesBetween, isLogged, type DayLike, type DaysByDate } from "./week";
 
@@ -90,12 +91,33 @@ export function trendSegments(points: readonly TrendPoint[]): TrendSegment[] {
   return out;
 }
 
-/** How the Y-axis is scaled: from 0, or fit to the data's min..max. (Ticket 22 adds manual.) */
-export type YMode = "zero" | "fit";
+/** How a series' Y-axis is scaled: fit to the data's min..max, from 0, or the Member's own min and max. */
+export type YMode = "fit" | "zero" | "manual";
 
 export interface YBounds {
   min: number;
   max: number;
+}
+
+/** A manual min/max as typed; a blank side (null) falls back to the zero-mode bound. */
+export interface ManualBounds {
+  min: number | null;
+  max: number | null;
+}
+
+/** What one series' bounds depend on besides its points (each series passes its own; ticket 23). */
+export interface BoundsOptions {
+  /** Used in manual mode. */
+  manual?: ManualBounds;
+  /** The series' goal line (see trendGoal). Zero and fit bounds stretch to keep it on screen. */
+  goal?: number | null;
+}
+
+/** Where the goal line goes for a metric: the Member's goal, the water goal for water, none for weight. A goal of 0 is "no goal". */
+export function trendGoal(goals: Goals | undefined, metric: TrendMetric): number | null {
+  if (!goals || metric === "weight") return null;
+  const g = num(goals[metric]);
+  return g > 0 ? g : null;
 }
 
 /** The old chart's default: weight zooms to its range, everything else starts at 0. */
@@ -103,12 +125,22 @@ export function defaultYMode(metric: TrendMetric): YMode {
   return metric === "weight" ? "fit" : "zero";
 }
 
-/** Y-axis bounds for the points. The max is at least 1 so a flat-zero line still has an axis. */
-export function trendBounds(points: readonly TrendPoint[], mode: YMode): YBounds {
+/** Y-axis bounds for one series. The max is at least 1 so a flat-zero line still has an axis. */
+export function trendBounds(points: readonly TrendPoint[], mode: YMode, opts: BoundsOptions = {}): YBounds {
+  const auto = autoBounds(points, mode === "fit", opts.goal ?? null);
+  if (mode !== "manual" || !opts.manual) return auto;
+  const out = { min: opts.manual.min ?? auto.min, max: opts.manual.max ?? auto.max };
+  return manualBoundsValid(out) ? out : auto;
+}
+
+/** A manual min/max the chart can use: both finite and min below max. */
+const manualBoundsValid = (b: YBounds) => Number.isFinite(b.min) && Number.isFinite(b.max) && b.min < b.max;
+
+function autoBounds(points: readonly TrendPoint[], fit: boolean, goal: number | null): YBounds {
   const vals = points.map((p) => p.value).filter((v): v is number => v !== null);
-  if (!vals.length) return { min: 0, max: 1 };
-  const max = Math.max(1, ...vals);
-  return { min: mode === "fit" ? Math.min(...vals) : 0, max };
+  const all = goal === null ? vals : [...vals, goal];
+  if (!all.length) return { min: 0, max: 1 };
+  return { min: fit && vals.length ? Math.min(...all) : 0, max: Math.max(1, ...all) };
 }
 
 /** The caption's numbers: points with data, and the highest of them (null with none). */
