@@ -42,6 +42,9 @@ function attr(token: string, names: Names) {
 
 function operand(token: string, rec: Rec | undefined, names: Names, values: Values): unknown {
   const t = token.trim();
+  // if_not_exists(path,:default), written without spaces.
+  const ine = /^if_not_exists\(([^,]+),([^)]+)\)$/.exec(t);
+  if (ine) return rec?.[attr(ine[1], names)] ?? operand(ine[2], rec, names, values);
   if (t.startsWith(":")) {
     if (!values || !(t in values)) unsupported("missing value placeholder", t);
     return values[t];
@@ -83,7 +86,8 @@ function applyUpdate(expr: string, rec: Rec, names: Names, values: Values) {
   if (parts.length % 2) unsupported("update expression", expr);
   const out: Rec = { ...rec };
   for (let i = 0; i < parts.length; i += 2) {
-    const items = parts[i + 1].split(",").map((s) => s.trim());
+    // Commas between actions, not inside if_not_exists(...).
+    const items = parts[i + 1].split(/,(?![^(]*\))/).map((s) => s.trim());
     if (parts[i] === "REMOVE") {
       for (const a of items) delete out[attr(a, names)];
       continue;
@@ -158,13 +162,14 @@ export class FakeDocClient {
   }
 
   /**
-   * All-or-nothing Put/Delete/ConditionCheck like DynamoDB: if any condition fails, nothing is written and a
+   * All-or-nothing Put/Update/Delete/ConditionCheck like DynamoDB: if any condition fails, nothing is written and a
    * TransactionCanceledException carries one CancellationReason per action, in order.
    */
   private transactWrite(input: TransactWriteCommand["input"]) {
     const actions = (input.TransactItems ?? []).map((t) => {
       if (t.Put) return { key: keyOf(t.Put.Item!), item: t.Put.Item as Rec, ...t.Put };
       if (t.Delete) return { key: keyOf(t.Delete.Key!), item: undefined, ...t.Delete };
+      if (t.Update) return { key: keyOf(t.Update.Key!), item: undefined, update: t.Update, ...t.Update };
       if (t.ConditionCheck) return { key: keyOf(t.ConditionCheck.Key!), item: undefined, check: true, ...t.ConditionCheck };
       return unsupported("transaction action", Object.keys(t).join(","));
     });
@@ -178,7 +183,10 @@ export class FakeDocClient {
     if (reasons.some((r) => r.Code !== "None")) throw new TransactionCanceledException(reasons);
     for (const a of actions) {
       if ("check" in a) continue;
-      if (a.item) this.table.set(a.key, clean(a.item));
+      if ("update" in a && a.update) {
+        const { Key, UpdateExpression, ExpressionAttributeNames: n, ExpressionAttributeValues: v } = a.update;
+        this.table.set(a.key, clean(applyUpdate(UpdateExpression!, this.table.get(a.key) ?? { ...Key }, n, v)));
+      } else if (a.item) this.table.set(a.key, clean(a.item));
       else this.table.delete(a.key);
     }
     return {};
