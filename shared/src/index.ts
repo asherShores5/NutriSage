@@ -3,5 +3,6 @@
 export * from "./bars";
 export * from "./day";
 export * from "./goals";
+export * from "./mealWindows";
 export * from "./nutrients";
 export * from "./guest";

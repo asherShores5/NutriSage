@@ -1,4 +1,4 @@
-// Goals (ticket 04) and Meal windows (ticket 07). Per Member, under MEMBER#<username> / GOALS.
+// Goals (ticket 04). Per Member, under MEMBER#<username> / GOALS.
 // Schema: schema/goals.graphql.
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { NUTRIENT_KEYS, defaultGoals, num, type Goals } from "@nutrisage/shared";
