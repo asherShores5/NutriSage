@@ -1,6 +1,6 @@
 // The Entry form's rules (estimated or hand-typed), kept pure so they're testable without a DOM.
 import {
-  GRAMS, NEW_FOOD_UNITS, NUTRIENTS, SERVING, isRecipe, logFood, parseAmount, recipeUnits, scaleSnapshot, servingUnits,
+  GRAMS, NEW_FOOD_UNITS, NUTRIENTS, SERVING, isRecipe, logFood, parseAmount, readNumberBox, recipeUnits, scaleSnapshot, servingUnits,
   type Amount, type Entry, type LibraryItem, type Meal, type NutrientKey, type Nutrition,
 } from "@nutrisage/shared";
 import type { Estimate } from "../../api/estimate";
@@ -25,9 +25,8 @@ export function readEntryForm({ name, meal, values, amount }: EntryFormValues): 
   if (!trimmed) return { ok: false, error: "Give the Entry a name" };
   const nutrition = {} as Nutrition;
   for (const n of NUTRIENTS) {
-    const raw = values[n.key].trim();
-    const v = raw === "" ? 0 : Number(raw);
-    if (!Number.isFinite(v) || v < 0) return { ok: false, error: `${n.label} must be a number, 0 or more` };
+    const v = readNumberBox(values[n.key], 0);
+    if (v === undefined) return { ok: false, error: `${n.label} must be a number, 0 or more` };
     nutrition[n.key] = v;
   }
   const a = parseAmount(amount, SERVING);
