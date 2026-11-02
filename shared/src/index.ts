@@ -10,5 +10,6 @@ export * from "./guest";
 export * from "./mealWindows";
 export * from "./nutrients";
 export * from "./scaling";
+export * from "./search";
 export * from "./trends";
 export * from "./week";

@@ -12,7 +12,7 @@ const food = (id: string, name: string, servingGrams: number, calories: number) 
   nutrition: { carbs: 0.5, protein: 0.1, fat: 0.05, fiber: 0.02, sodium: 1, iron: 0.01, calories: calories / servingGrams },
   units: [{ label: "serving", grams: servingGrams }, { label: "g", grams: 1 }],
 });
-db.seed(food("food-oats", "Rolled oats", 40, 150), food("food-yogurt", "Greek yogurt", 170, 100));
+db.seed(food("food-oats", "Rolled oats", 40, 150), food("food-yogurt", "Greek yogurt", 170, 100), food("food-oatmilk", "Oat milk", 240, 120));
 
 const app = await launch();
 const c = checklist("favorites");
@@ -63,6 +63,13 @@ await c.check("the order is kept on the server: it survives a reload", async () 
   await p.waitForTimeout(300); // let the last bump reach the API
   await p.reload();
   await expect.poll(order).toEqual(["Greek yogurt", "Rolled oats"]);
+});
+
+await c.check("a Favorite ranks first in the add box's search", async () => {
+  const form = p.getByRole("form", { name: "Add an Entry" });
+  await form.getByLabel("Food").fill("oat");
+  await expect(form.getByRole("listbox", { name: "Library matches" }).getByRole("option").first()).toHaveText(/Rolled oats/);
+  await form.getByLabel("Food").fill("");
 });
 
 await c.check("unstarring removes it from Quick Add", async () => {
