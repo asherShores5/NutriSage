@@ -84,10 +84,14 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
 - **Junk numbers become 0, never NaN** (`num()` in shared). Bedrock replies and old data can hold
   junk; don't "simplify" the coercion away. The API refuses non-finite or negative nutrients.
 - **Food names are untrusted**: render them as React text, never `dangerouslySetInnerHTML`.
-- **Bedrock** (ticket 02): model access is region- and account-gated and needs an *active* US
+- **Bedrock**: model access is region- and account-gated and needs an *active* US
   inference profile ID (the `us.` prefix); invoking the bare model ID on demand fails. Keep a
   Sonnet-class model: estimates are mostly recall of branded and restaurant items, where Haiku
-  underestimated portions.
+  underestimated portions. The model is `ESTIMATE_MODEL` in `infra/lib/estimate.ts` (Sonnet 4.6,
+  called from us-west-1 via `us.anthropic.claude-sonnet-4-6`; Sonnet 5.x isn't offered to the
+  account yet); it sets `MODEL_ID` and an InvokeModel grant on the profile + its 4 US model ARNs.
+  The estimate core (prompt, length cap, lenient parse) is `api/src/estimate.ts`, shared by the
+  Member `estimate` mutation and the Guest endpoint; tests stub Bedrock via `testing/fakeBedrock.ts`.
 - **The old backend** (until ticket 24): an Organizations SCP blocks public Lambda Function URLs,
   which is why it sits behind an HTTP API. Its `update-function-configuration --environment`
   replaces the whole variable map, so re-send every variable together.

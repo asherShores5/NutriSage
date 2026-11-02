@@ -1,5 +1,6 @@
-// The hand-typed Entry form's rules, kept pure so they're testable without a DOM.
+// The Entry form's rules (estimated or hand-typed), kept pure so they're testable without a DOM.
 import { NUTRIENTS, type Entry, type Meal, type NutrientKey, type Nutrition } from "@nutrisage/shared";
+import type { Estimate } from "../../api/estimate";
 
 export interface EntryFormValues {
   name: string;
@@ -24,4 +25,9 @@ export function readEntryForm({ name, meal, values }: EntryFormValues): EntryFor
     nutrition[n.key] = v;
   }
   return { ok: true, entry: { meal, name: trimmed, nutrition } };
+}
+
+/** The Entry for one estimated serving: Bedrock's nutrition snapshot plus its gram weight when known. */
+export function entryFromEstimate(est: Estimate, meal: Meal): Omit<Entry, "id"> {
+  return { meal, name: est.name, nutrition: est.nutrition, ...(est.servingGrams ? { grams: est.servingGrams } : {}) };
 }

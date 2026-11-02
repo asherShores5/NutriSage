@@ -1,5 +1,5 @@
 // Fake backend for browser checks (Honey Do's pattern): the real API handler on the in-memory
-// table, behind a GraphQL executor built from the composed schema/*.graphql, plus just enough
+// table and a stubbed Bedrock, behind a GraphQL executor built from the composed schema/*.graphql, plus just enough
 // Cognito for the web app to sign in. Nothing here talks to AWS.
 import { buildSchema, defaultFieldResolver, execute, parse, type GraphQLFieldResolver } from "graphql";
 import { composeSchemaDir } from "../schema/compose";
@@ -17,12 +17,17 @@ export const MEMBERS: Record<string, Member> = {
 // handler.ts reads these at import time, so import it only after setting them.
 process.env.TABLE_NAME = "e2e-table";
 process.env.ALLOWED_USERNAMES = Object.keys(MEMBERS).join(",");
-const { handler, setDocClient } = await import("../api/src/handler");
+process.env.MODEL_ID = "e2e-model";
+const { handler, setDocClient, setBedrockClient } = await import("../api/src/handler");
 const { FakeDocClient } = await import("../api/src/testing/fakeDynamo");
+const { FakeBedrock } = await import("../api/src/testing/fakeBedrock");
 const { appSyncEvent } = await import("../api/src/testing/harness");
 
 export const db = new FakeDocClient();
 setDocClient(db);
+/** The stubbed model: a check scripts the next estimate with `bedrock.reply(json)` or `bedrock.fail(err)`. */
+export const bedrock = new FakeBedrock();
+setBedrockClient(bedrock);
 
 // AppSync supplies these scalars; graphql-js needs them declared.
 const schema = buildSchema(`scalar AWSJSON\nscalar AWSDate\n${composeSchemaDir()}`);
@@ -157,7 +162,7 @@ export async function seed(date: string) {
     input: {
       date,
       entries: [
-        { id: "s1", meal: "breakfast", name: "Oatmeal with berries", nutrition: n(40, 8, 5, 240) },
+        { id: "s1", meal: "breakfast", name: "Oatmeal with berries", nutrition: n(40, 8, 5, 240), grams: 250 },
         { id: "s2", meal: "lunch", name: "Turkey sandwich", nutrition: n(45, 28, 12, 410) },
         { id: "s3", meal: "dessert", name: "Dark chocolate square", nutrition: n(6, 1, 5, 70) },
       ],

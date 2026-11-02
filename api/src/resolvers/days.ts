@@ -6,7 +6,7 @@ import { TABLE, dayKey, ddb, memberPk, strip } from "../table";
 import type { ResolverModule } from "./types";
 
 /** Record caps against a scripted flood, generous enough that real logging never meets them. */
-export const DAY_LIMITS = { entries: 200, nameLength: 120, nutrient: 100_000, water: 100, weight: 2_000 } as const;
+export const DAY_LIMITS = { entries: 200, nameLength: 120, nutrient: 100_000, water: 100, weight: 2_000, grams: 100_000 } as const;
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 function finiteIn(v: unknown, max: number, what: string): number {
@@ -30,7 +30,8 @@ function validateEntry(e: unknown): Entry {
   if (!MEALS.includes(src.meal as never)) throw invalid("bad Meal");
   const name = typeof src.name === "string" ? src.name.trim() : "";
   if (!name || name.length > DAY_LIMITS.nameLength) throw invalid(`Entry name must be 1-${DAY_LIMITS.nameLength} characters`);
-  return { id: src.id, meal: src.meal as Entry["meal"], name, nutrition: validateNutrition(src.nutrition) };
+  const grams = optionalIn(src.grams, DAY_LIMITS.grams, "grams");
+  return { id: src.id, meal: src.meal as Entry["meal"], name, nutrition: validateNutrition(src.nutrition), ...(grams === null ? {} : { grams }) };
 }
 
 export function validateDayInput(input: unknown): Omit<Day, "updatedAt"> {

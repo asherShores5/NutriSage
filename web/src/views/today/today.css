@@ -9,6 +9,9 @@
 .nutrient-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: 0.5rem; }
 .nutrient-inputs label { display: grid; gap: 0.2rem; font-size: 0.8rem; color: var(--muted); }
 .nutrient-inputs input { width: 100%; }
+.entry-form-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.entry-form-actions .link { background: none; border: 0; padding: 0; height: auto; color: var(--accent); }
+.entry-grams { color: var(--muted); font-size: 0.85rem; margin-left: 0.4rem; }
 
 .entry-list { margin-top: 1rem; }
 .meal-group h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 1rem 0 0.4rem; }

@@ -33,6 +33,14 @@ describe("a Member's Days", () => {
     expect(d.entries.map((e: { id: string }) => e.id)).toEqual(["e1", "e2"]);
   });
 
+  it("an Entry keeps its gram weight when known, and has none otherwise", async () => {
+    await h.call(h.A, "putDay", { input: day("2026-11-02", [{ ...entry("e1", "2 eggs scrambled"), grams: 122 }, entry("e2", "Apple")]) });
+    const [d] = await h.call(h.A, "days", { from: "2026-11-02", to: "2026-11-02" });
+    expect(d.entries[0].grams).toBe(122);
+    expect(d.entries[1].grams ?? null).toBeNull();
+    await expect(h.call(h.A, "putDay", { input: day("2026-11-02", [{ ...entry("e1", "x"), grams: -1 }]) })).rejects.toThrow("ValidationError");
+  });
+
   it("days returns only dates inside the range, oldest first", async () => {
     for (const date of ["2026-10-31", "2026-11-02", "2026-11-01", "2026-11-05"]) {
       await h.call(h.A, "putDay", { input: day(date, [entry("e", "x")]) });

@@ -1,2 +1,18 @@
-# Bedrock nutrition estimates (ticket 02). Resolvers: api/src/resolvers/estimate.ts.
-# Placeholder: add types here and fields with `extend type Query { ... }` / `extend type Mutation { ... }`.
+# Bedrock nutrition estimates (api/src/resolvers/estimate.ts; the core is api/src/estimate.ts).
+
+"What Bedrock thinks one serving of a typed Food holds. Junk numbers in the model's reply become 0."
+type Estimate {
+  "The food text as estimated (trimmed, at most 200 characters)."
+  name: String!
+  "For the serving named in the text, or one typical serving."
+  nutrition: Nutrition!
+  "Gram weight of that serving, or null when the model gave no believable one."
+  servingGrams: Float
+  "Raw-to-prepared weight ratio; only when asked with ingredient: true."
+  yieldRatio: Float
+}
+
+extend type Mutation {
+  "Estimate one serving of `text` (e.g. \"2 eggs scrambled\"). Set ingredient for a Recipe ingredient's Yield ratio."
+  estimate(text: String!, ingredient: Boolean): Estimate!
+}

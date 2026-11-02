@@ -14,6 +14,8 @@ type Entry {
   name: String!
   "Snapshot taken at log time; Library edits never change it."
   nutrition: Nutrition!
+  "Gram weight of what was logged, when known."
+  grams: Float
 }
 
 input EntryInput {
@@ -21,6 +23,7 @@ input EntryInput {
   meal: Meal!
   name: String!
   nutrition: NutritionInput!
+  grams: Float
 }
 
 type Day {

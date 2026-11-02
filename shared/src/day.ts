@@ -11,14 +11,16 @@ export const MEAL_LABELS: Record<Meal, string> = {
 
 /**
  * An amount of one Food or Recipe logged into a Meal. `nutrition` is a snapshot taken at log time:
- * later Library edits never change it. Ticket 01 logs by hand (name + nutrition); amount, unit,
- * grams and the Library reference arrive with later tickets as optional fields.
+ * later Library edits never change it. Ticket 01 logs by hand (name + nutrition); ticket 02 adds
+ * grams from a Bedrock estimate; amount, unit and the Library reference arrive with later tickets.
  */
 export interface Entry {
   id: string;
   meal: Meal;
   name: string;
   nutrition: Nutrition;
+  /** Gram weight of what was logged, when known (e.g. the serving weight from an estimate). */
+  grams?: number | null;
 }
 
 /** One Member's Day. The whole Day is written at once (last write wins per Day). */

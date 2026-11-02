@@ -3,6 +3,7 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { beforeAll, describe, expect, it } from "vitest";
 import { composeSchemaDir, rootFields } from "../../schema/compose";
 import { buildApp } from "../lib/app";
+import { ESTIMATE_MODEL } from "../lib/estimate";
 import { USERNAMES } from "../lib/stacks";
 
 // One synth for the whole file: bundling the API Lambda with esbuild is the slow part.
@@ -91,5 +92,38 @@ describe("API", () => {
 describe("public repo hygiene", () => {
   it("synths with no AWS account ID in the template", () => {
     expect(JSON.stringify(app.toJSON())).not.toMatch(/\b\d{12}\b/);
+  });
+});
+
+describe("Bedrock estimates", () => {
+  it("the API Lambda calls the chosen US inference profile, set by MODEL_ID", () => {
+    expect(ESTIMATE_MODEL.profileId).toBe("us.anthropic.claude-sonnet-4-6");
+    app.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: { Variables: Match.objectLike({ MODEL_ID: "us.anthropic.claude-sonnet-4-6" }) },
+    });
+  });
+
+  it("IAM allows only InvokeModel, only on that profile and its model in the US regions it routes to", () => {
+    const statements = Object.values(app.findResources("AWS::IAM::Policy"))
+      .flatMap((p) => p.Properties.PolicyDocument.Statement)
+      .filter((s: any) => [s.Action].flat().some((a: string) => a.startsWith("bedrock:")));
+    expect(statements).toHaveLength(1);
+    const [s] = statements;
+    expect(s.Effect).toBe("Allow");
+    expect(s.Action).toBe("bedrock:InvokeModel");
+    const resources = JSON.stringify(s.Resource);
+    expect(resources).toContain(":inference-profile/us.anthropic.claude-sonnet-4-6");
+    for (const r of ["us-east-1", "us-east-2", "us-west-1", "us-west-2"]) {
+      expect(resources).toContain(`arn:aws:bedrock:${r}::foundation-model/anthropic.claude-sonnet-4-6`);
+    }
+    expect(resources).not.toContain("*");
+    expect(s.Resource).toHaveLength(5);
+  });
+
+  it("gives the Lambda time for a model call (AppSync waits up to 30 s)", () => {
+    const fns = Object.values(app.findResources("AWS::Lambda::Function")).filter((f) => f.Properties.Environment?.Variables?.MODEL_ID);
+    expect(fns).toHaveLength(1);
+    expect(fns[0].Properties.Timeout).toBeGreaterThanOrEqual(20);
+    expect(fns[0].Properties.Timeout).toBeLessThan(30);
   });
 });
