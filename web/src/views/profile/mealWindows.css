@@ -1,0 +1,4 @@
+.meal-windows form { display: grid; gap: 0.5rem; width: 100%; }
+.meal-windows label { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.meal-windows input[type="time"] { min-width: 8rem; }
+.meal-windows-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 0.25rem; }

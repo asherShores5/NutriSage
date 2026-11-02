@@ -14,6 +14,7 @@ Not a workspace, so CI never installs it.
     npx tsx parity.ts          # Today parity: Goals, every Meal incl. Dessert, bars, water, weight, theme
     npx tsx estimate.ts        # type a Food, log the (stubbed) Bedrock estimate
     npx tsx passkeys.ts        # add a passkey, sign in with it (virtual authenticator), password backup
+    npx tsx mealWindows.ts     # Meal windows (faked clock): guess on open, a pick sticks, rollover, Profile edit
     npx tsx tour.ts            # screenshots of every tab: phone, desktop, dark
 
 Screenshots go to `/tmp/e2e-nutrisage-<checkout folder>/` (override with `E2E_OUT`), so parallel

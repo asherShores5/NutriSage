@@ -34,6 +34,8 @@ export interface OpenOptions {
    * verification. Its passkeys live in this browser context only, like a real device's.
    */
   authenticator?: boolean;
+  /** Fake the page's clock from this moment (Playwright clock: timers and Date; time keeps running). */
+  clock?: Date | string;
 }
 
 export async function launch() {
@@ -45,6 +47,7 @@ export async function launch() {
     const context = await browser.newContext({
       ...screen, serviceWorkers: "block", timezoneId: "America/Los_Angeles", colorScheme: opts.dark ? "dark" : "light",
     });
+    if (opts.clock) await context.clock.install({ time: opts.clock });
     const page = await context.newPage();
     if (opts.authenticator) {
       const cdp = await context.newCDPSession(page);
