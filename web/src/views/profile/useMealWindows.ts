@@ -1,32 +1,14 @@
-// The Member's Meal windows, shared by Today (the Meal picker's guess) and the Profile card. Loaded
-// once per app session and kept in memory, like useGoals; saving updates every screen.
-import { useCallback, useEffect, useSyncExternalStore } from "react";
-import type { MealWindows } from "@nutrisage/shared";
-import { getMealWindows, putMealWindows } from "../../api/mealWindows";
-
-let windows: MealWindows | undefined;
-let loading: Promise<void> | undefined;
-let error: string | undefined;
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
-const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l));
-
-function load() {
-  loading ??= getMealWindows().then(
-    (w) => { windows = w; error = undefined; emit(); },
-    (e) => { error = (e as Error).message; loading = undefined; emit(); },
-  );
-}
+// The Member's Meal windows, shared by Today (the Meal picker's guess) and the Profile card. Kept in
+// the Member's local copy (sync/memberData.ts), like useGoals: they show offline, a change is queued
+// in the outbox, they reload on focus, and saving updates every screen at once.
+import { useEffect, useSyncExternalStore } from "react";
+import { currentMealWindows, mealWindowsError, saveMealWindows, subscribe, watchMealWindows } from "../../sync/memberData";
 
 /** `windows` is undefined until loaded (Today uses the defaults meanwhile). */
 export function useMealWindows() {
-  const current = useSyncExternalStore(subscribe, () => windows);
-  const loadError = useSyncExternalStore(subscribe, () => error);
-  useEffect(load, []);
-  /** Save new windows; resolves when stored, throws on failure (the card shows the message). */
-  const save = useCallback(async (next: MealWindows) => {
-    windows = await putMealWindows(next);
-    emit();
-  }, []);
-  return { windows: current, error: loadError, save };
+  const windows = useSyncExternalStore(subscribe, currentMealWindows);
+  const error = useSyncExternalStore(subscribe, mealWindowsError);
+  useEffect(watchMealWindows, []);
+  /** Save new windows; resolves when stored or queued offline, throws if the API refused them (the card shows the message). */
+  return { windows, error, save: saveMealWindows };
 }

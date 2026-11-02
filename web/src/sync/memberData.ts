@@ -1,4 +1,4 @@
-// The Member's data on this device: a local copy of the Days, goals and Favorites the screens have opened,
+// The Member's data on this device: a local copy of the Days, goals, Meal windows and Favorites the screens have opened,
 // saved in localStorage, plus the outbox that writes them through to the API (HoneyDo-style:
 // local copy first, server is the sync layer). Screens read and write through useDay/useGoals;
 // nothing here renders.
@@ -6,7 +6,7 @@
 // - A change shows at once and is saved on the device before it is sent, so logging works offline
 //   and survives closing the app. The outbox sends writes in order when the API answers again.
 // - Opening the app, coming back to it (visible or focused) and going back online first send the
-//   outbox, then reload every open Day and the goals, so changes from other devices show up.
+//   outbox, then reload every open Day, the goals, Meal windows and Favorites, so changes from other devices show up.
 // - Every write carries the whole row: last write wins per Day. A row with a queued write keeps
 //   the local copy over the server's until that write lands.
 // - Except a Day changed here while this device may not hold the server's current copy (opened
@@ -17,11 +17,12 @@
 // - Only a signed-in Member's copy is saved; it's dropped when a different Member (or nobody)
 //   signs in on this device. A Guest's data already lives on the device (guest/store.ts, behind
 //   the same api/ calls), so for a Guest this is an in-memory copy only.
-import { bumpFavorites, daysByDate, mergeDays, toggleFavorite as toggled, type Day, type Favorite, type Goals } from "@nutrisage/shared";
+import { bumpFavorites, daysByDate, mergeDays, toggleFavorite as toggled, type Day, type Favorite, type Goals, type MealWindows } from "@nutrisage/shared";
 import { getDays, putDay } from "../api/days";
 import { NetworkError } from "../api/errors";
 import { deleteFavorite, getFavorites, putFavorite } from "../api/favorites";
 import { getGoals, putGoals } from "../api/goals";
+import { getMealWindows, putMealWindows } from "../api/mealWindows";
 import { currentUsername, onAuthChange } from "../auth";
 import { isGuest, onSessionChange } from "../session";
 import { createOutbox, opRow, type Op } from "./outbox";
@@ -38,6 +39,7 @@ interface Cache {
   user?: string;
   days: Record<string, Day>;
   goals?: Goals;
+  mealWindows?: MealWindows;
   favorites?: Favorite[];
   /**
    * Days with a queued write: the server copy the change started from (null: none, e.g. opened
@@ -50,6 +52,7 @@ interface Cache {
 
 const dayRow = (date: string) => `DAY#${date}`;
 const GOALS_ROW = "GOALS";
+const WINDOWS_ROW = "MEAL_WINDOWS";
 /** Errors and edit counts for the Favorites as a whole (each Favorite is its own outbox row, FAV#<libraryId>). */
 const FAVS_ROW = "FAVORITES";
 const isFavOp = (op: Op) => op.type === "putFavorite" || op.type === "deleteFavorite";
@@ -68,6 +71,7 @@ const edits = new Map<string, number>();
 /** Dates open on some screen (ref-counted), reloaded on resume. */
 const watched = new Map<string, number>();
 let goalsWatched = false;
+let windowsWatched = false;
 let favoritesWatched = false;
 /** Dates whose copy here came from the server since the API was last unreachable (in memory only). */
 const fresh = new Set<string>();
@@ -88,7 +92,7 @@ function readJSON<T>(key: string): T | undefined {
 
 function readCache(u: string | undefined): Cache {
   const c = persisted(u) ? readJSON<Cache>(CACHE) : undefined;
-  return c && c.user === u ? { user: u, days: c.days ?? {}, goals: c.goals, favorites: c.favorites, pending: c.pending, offlineStarted: c.offlineStarted } : { user: u, days: {} };
+  return c && c.user === u ? { user: u, days: c.days ?? {}, goals: c.goals, mealWindows: c.mealWindows, favorites: c.favorites, pending: c.pending, offlineStarted: c.offlineStarted } : { user: u, days: {} };
 }
 
 function readOps(u: string | undefined): Op[] {
@@ -121,6 +125,7 @@ function newOutbox(u: string | undefined) {
       switch (op.type) {
         case "putDay": return sendDay(op.day);
         case "putGoals": return putGoals(op.goals);
+        case "putMealWindows": return putMealWindows(op.windows);
         case "putFavorite": return putFavorite(op.favorite);
         case "deleteFavorite": return deleteFavorite(op.libraryId);
       }
@@ -132,6 +137,7 @@ function newOutbox(u: string | undefined) {
         settled(op.day.date);
       }
       else if (op.type === "putGoals") cache.goals = result as Goals;
+      else if (op.type === "putMealWindows") cache.mealWindows = result as MealWindows;
       else if (op.type === "putFavorite") {
         // The server keeps the newer last-used time (another device may have logged it later).
         const fav = result as Favorite;
@@ -145,6 +151,7 @@ function newOutbox(u: string | undefined) {
       // Show what the server actually holds instead of the refused change.
       if (op.type === "putDay") void loadDay(op.day.date, true);
       else if (op.type === "putGoals") void loadGoals(true);
+      else if (op.type === "putMealWindows") void loadMealWindows(true);
       else void loadFavorites(true);
       emit();
     },
@@ -249,6 +256,20 @@ async function loadGoals(keepError = false) {
   emit();
 }
 
+async function loadMealWindows(keepError = false) {
+  const at = edits.get(WINDOWS_ROW) ?? 0;
+  try {
+    const server = await getMealWindows();
+    if ((edits.get(WINDOWS_ROW) ?? 0) !== at || outbox.pendingFor(WINDOWS_ROW)) return;
+    cache.mealWindows = server;
+    writeCache();
+    if (!keepError) errors = { ...errors, [WINDOWS_ROW]: undefined };
+  } catch (e) {
+    if (!(e instanceof NetworkError)) errors = { ...errors, [WINDOWS_ROW]: (e as Error).message };
+  }
+  emit();
+}
+
 /**
  * The server's Favorites with this device's queued Favorite writes laid over them. If a Favorite
  * changed here while loading, the local copy stays (the outbox will send it).
@@ -285,6 +306,7 @@ export function resume(): Promise<void> {
     await Promise.all([
       ...[...watched.keys()].map((d) => loadDay(d)),
       goalsWatched ? loadGoals() : undefined,
+      windowsWatched ? loadMealWindows() : undefined,
       favoritesWatched ? loadFavorites() : undefined,
     ]);
   })().finally(() => (resuming = undefined));
@@ -400,6 +422,30 @@ export async function saveGoals(goals: Goals): Promise<void> {
   emit();
   await outbox.enqueue({ type: "putGoals", goals });
   const refused = errors[GOALS_ROW];
+  if (refused) throw new Error(refused);
+}
+
+// ---- Meal windows --------------------------------------------------------------
+
+/** The Member's Meal windows (undefined until first loaded; Today guesses with the defaults meanwhile). */
+export const currentMealWindows = () => cache.mealWindows;
+export const mealWindowsError = () => errors[WINDOWS_ROW];
+
+export function watchMealWindows() {
+  if (windowsWatched) return;
+  windowsWatched = true;
+  void loadMealWindows();
+}
+
+/** Save Meal windows on the device and queue them; throws if the API refused them (like saveGoals). */
+export async function saveMealWindows(windows: MealWindows): Promise<void> {
+  bump(WINDOWS_ROW);
+  cache.mealWindows = windows;
+  errors = { ...errors, [WINDOWS_ROW]: undefined };
+  writeCache();
+  emit();
+  await outbox.enqueue({ type: "putMealWindows", windows });
+  const refused = errors[WINDOWS_ROW];
   if (refused) throw new Error(refused);
 }
 

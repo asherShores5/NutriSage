@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dateKey, foodEdit } from "@nutrisage/shared";
+import { DEFAULT_MEAL_WINDOWS, dateKey, foodEdit } from "@nutrisage/shared";
 
 // Guest mode at the data/session layer: the same api/days and api/estimate functions Today uses,
 // answered from browser storage (Days) and the Guest estimate endpoint (estimates) for a Guest.
@@ -38,6 +38,7 @@ async function launch() {
     recipes: await import("./api/recipes"),
     store: await import("./guest/store"),
     favorites: await import("./api/favorites"),
+    mealWindows: await import("./api/mealWindows"),
   };
 }
 
@@ -97,6 +98,16 @@ describe("a Guest", () => {
     await goals.putGoals({ ...(await goals.getGoals()), calories: 1800 });
     const again = await launch();
     expect((await again.goals.getGoals()).calories).toBe(1800);
+    expect(requests).toEqual([]);
+  });
+
+  it("has the default Meal windows and keeps the ones they set, on this device only", async () => {
+    const { session, mealWindows } = await launch();
+    session.enterGuest();
+    expect(await mealWindows.getMealWindows()).toEqual(DEFAULT_MEAL_WINDOWS);
+    await mealWindows.putMealWindows({ ...DEFAULT_MEAL_WINDOWS, lunch: "12:30" });
+    const again = await launch();
+    expect((await again.mealWindows.getMealWindows()).lunch).toBe("12:30");
     expect(requests).toEqual([]);
   });
 

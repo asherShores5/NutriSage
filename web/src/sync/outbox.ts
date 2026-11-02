@@ -1,14 +1,15 @@
-// The Member's outbox: whole-row writes (a Day, the goals, one Favorite) saved on the device first, then sent to
+// The Member's outbox: whole-row writes (a Day, the goals, the Meal windows, one Favorite) saved on the device first, then sent to
 // the API one at a time, oldest first. Offline, or on a weak signal, the writes wait on the device
 // and go out when the API answers again. Copied in shape from Honey Do (web/src/outbox.ts +
 // store.ts flush) but simpler: every write carries the whole row and the last write wins, so
 // there is no conflict replay. Pure: storage and the network are passed in, so tests drive it.
-import type { Day, Favorite, Goals } from "@nutrisage/shared";
+import type { Day, Favorite, Goals, MealWindows } from "@nutrisage/shared";
 import { NetworkError } from "../api/errors";
 
 export type Op =
   | { id: string; type: "putDay"; day: Day }
   | { id: string; type: "putGoals"; goals: Goals }
+  | { id: string; type: "putMealWindows"; windows: MealWindows }
   | { id: string; type: "putFavorite"; favorite: Favorite }
   | { id: string; type: "deleteFavorite"; libraryId: string };
 export type NewOp = Op extends infer O ? (O extends Op ? Omit<O, "id"> : never) : never;
@@ -18,6 +19,7 @@ export function opRow(op: NewOp | Op): string {
   switch (op.type) {
     case "putDay": return `DAY#${op.day.date}`;
     case "putGoals": return "GOALS";
+    case "putMealWindows": return "MEAL_WINDOWS";
     case "putFavorite": return `FAV#${op.favorite.libraryId}`;
     case "deleteFavorite": return `FAV#${op.libraryId}`;
   }
