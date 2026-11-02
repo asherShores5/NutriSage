@@ -42,6 +42,14 @@ describe("a Member's Days", () => {
     await expect(h.call(h.A, "putDay", { input: day("2026-11-02", [{ ...entry("e1", "x"), grams: -1 }]) })).rejects.toThrow("ValidationError");
   });
 
+  it("an Entry keeps its amount and unit; a migrated Entry has neither", async () => {
+    await h.call(h.A, "putDay", { input: day("2026-11-02", [{ ...entry("e1", "Eggs"), amount: 1.5, unit: "serving", grams: 180 }, entry("e2", "Old")]) });
+    const [d] = await h.call(h.A, "days", { from: "2026-11-02", to: "2026-11-02" });
+    expect(d.entries[0]).toMatchObject({ amount: 1.5, unit: "serving", grams: 180 });
+    expect(d.entries[1].amount ?? null).toBeNull();
+    expect(d.entries[1].unit ?? null).toBeNull();
+  });
+
   it("days returns only dates inside the range, oldest first", async () => {
     for (const date of ["2026-10-31", "2026-11-02", "2026-11-01", "2026-11-05"]) {
       await h.call(h.A, "putDay", { input: day(date, [entry("e", "x")]) });
@@ -106,6 +114,16 @@ describe("Day validation", () => {
     await bad(day("2026-11-02", [{ ...entry("e1", "x"), nutrition: { ...nutrition(100), fat: -1 } }]));
     await bad(day("2026-11-02", [{ ...entry("e1", "x"), nutrition: { ...nutrition(100), carbs: "12" } }]));
     await bad(day("2026-11-02", [{ ...entry("e1", "x"), nutrition: { carbs: 1 } }]));
+  });
+
+  it("refuses an amount of 0 or less, over 100 (over 5000 in g), or a bad unit", async () => {
+    await bad(day("2026-11-02", [{ ...entry("e1", "x"), amount: 0, unit: "serving" }]));
+    await bad(day("2026-11-02", [{ ...entry("e1", "x"), amount: 101, unit: "serving" }]));
+    await bad(day("2026-11-02", [{ ...entry("e1", "x"), amount: 5001, unit: "g" }]));
+    await bad(day("2026-11-02", [{ ...entry("e1", "x"), amount: 1, unit: " " }]));
+    await bad(day("2026-11-02", [{ ...entry("e1", "x"), amount: 1, unit: "u".repeat(31) }]));
+    await bad(day("2026-11-02", [{ ...entry("e1", "x"), amount: 2 }]));
+    await h.call(h.A, "putDay", { input: day("2026-11-02", [{ ...entry("e1", "x"), amount: 350, unit: "g" }]) });
   });
 
   it("refuses a bad date, an unknown Meal, an empty name or duplicate Entry ids", async () => {

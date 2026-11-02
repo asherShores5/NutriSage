@@ -26,6 +26,11 @@ async function sweep(p: Page, name: string) {
     await p.waitForTimeout(200);
     await shot(p, `tour-${name}-${String(i + 1).padStart(2, "0")}-${t.toLowerCase()}`);
   }
+  // Trends with gaps: weight is logged every third Day, so the line is mostly dashed bridges.
+  await tab(p, "Trends");
+  await p.getByLabel("Metric").selectOption("weight");
+  await p.waitForTimeout(200);
+  await shot(p, `tour-${name}-03b-trends-weight-gaps`);
   // Today's form switched to typing nutrition by hand.
   await tab(p, "Today");
   await p.getByRole("button", { name: "Type nutrition by hand" }).click();
