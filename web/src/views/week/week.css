@@ -1,0 +1,6 @@
+/* Week tab. */
+.card.streak { justify-items: center; text-align: center; }
+.streak-big { font-size: 2.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.week-section { margin-top: 1.25rem; }
+.week-section h3 { margin: 0 0 0.15rem; font-size: 1.05rem; }
+.week-section .bars { margin-top: 0.5rem; }

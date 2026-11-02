@@ -4,3 +4,5 @@ export * from "./bars";
 export * from "./day";
 export * from "./goals";
 export * from "./nutrients";
+export * from "./week";
+export * from "./trends";
