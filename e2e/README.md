@@ -13,6 +13,7 @@ Not a workspace, so CI never installs it.
     npx tsx today.ts           # walking skeleton: sign in, log an Entry, totals, persistence
     npx tsx parity.ts          # Today parity: Goals, every Meal incl. Dessert, bars, water, weight, theme
     npx tsx estimate.ts        # type a Food, log the (stubbed) Bedrock estimate
+    npx tsx offline.ts         # log offline, reload offline (service worker), sync back; phone -> desktop on focus
     npx tsx passkeys.ts        # add a passkey, sign in with it (virtual authenticator), password backup
     npx tsx tour.ts            # screenshots of every tab: phone, desktop, dark
 
@@ -21,5 +22,5 @@ worktrees don't overwrite each other. Add a new check script per feature area (e
 using `checklist()` from `lib.ts`, and add its screens to `tour.ts`.
 
 Not covered: real device passkeys (Face ID, iCloud Keychain, phone QR; `passkeys.ts` uses a
-Chromium virtual authenticator), iOS install quirks, offline launch (service workers are
-blocked so routes see every request).
+Chromium virtual authenticator), iOS install quirks. Service workers are blocked unless a check
+opts in (`offline.ts` does).

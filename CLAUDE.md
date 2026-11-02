@@ -60,7 +60,9 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   (GraphQL calls), `tabs.ts` (bottom tab registry), `components/` (shared by tabs, e.g. `Bars`), `views/<tab>/` (one folder per tab with its own
   components and CSS: today, week, trends, goals, profile). Today is split into `EntryForm` (add box),
   `EntryList` + `EntryEditor`, `Water`, `Weight`, and `components/Bars`; `views/goals/useGoals.ts` is the
-  in-memory goals store both Today and Goals read. Theme: `src/theme.ts` + pre-paint `public/theme.js` (no inline scripts under the CSP). `sw/sw.ts` + `src/swShell.ts`: the
+  goals hook both Today and Goals read. Both hooks sit on `sync/memberData.ts` (the Member's local copy in
+  localStorage, write-through via the pure outbox in `sync/outbox.ts`; reloads open Days and goals on
+  focus, visibility and `online`). `api/gql.ts` throws `NetworkError` for anything retryable. Theme: `src/theme.ts` + pre-paint `public/theme.js` (no inline scripts under the CSP). `sw/sw.ts` + `src/swShell.ts`: the
   hand-rolled service worker built by `vite.config.ts`.
 - `e2e/`: Playwright against an in-process fake backend (`backend.ts`: the real handler on
   `api/src/testing/fakeDynamo.ts`, fake Cognito), launcher `app.ts`, helpers `lib.ts`.
@@ -100,5 +102,6 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   replaces the whole variable map, so re-send every variable together.
 - **GitHub Pages** (`.github/workflows/static.yml`) still uploads the whole repo on push to `main`
   for the old app; the Pages URL path depends on the repo name, so the rename waits for cutover.
-- Not testable in e2e: real device passkeys (Face ID, Keychain, phone QR), iOS install quirks, offline launch (service
-  workers are blocked so routes see every request). Verify those on device after deploy.
+- Not testable in e2e: real device passkeys (Face ID, Keychain, phone QR), iOS install quirks. Service workers are blocked
+  by default; `e2e/offline.ts` opts in (`open(user, { serviceWorkers: true })`) and uses `setOffline(page, on)`.
+  Verify those on device after deploy.
