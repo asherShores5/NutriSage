@@ -22,6 +22,25 @@ type Entry {
   unit: String
   "The Library item it was logged from, if any. A pointer only: the snapshot is what counts."
   libraryId: ID
+  "A Recipe Entry's ingredient breakdown for this portion, snapshotted at log time."
+  ingredients: [EntryIngredient!]
+}
+
+"One ingredient's share of a logged Recipe portion (shared/src/day.ts)."
+type EntryIngredient {
+  name: String!
+  nutrition: Nutrition!
+  grams: Float
+  amount: Float
+  unit: String
+}
+
+input EntryIngredientInput {
+  name: String!
+  nutrition: NutritionInput!
+  grams: Float
+  amount: Float
+  unit: String
 }
 
 input EntryInput {
@@ -33,6 +52,7 @@ input EntryInput {
   amount: Float
   unit: String
   libraryId: ID
+  ingredients: [EntryIngredientInput!]
 }
 
 type Day {

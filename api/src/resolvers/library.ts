@@ -3,36 +3,45 @@
 //
 // Ticket 12: the `library` query, and addEstimatedFood, which the Member estimate resolver calls so
 // every estimated Food lands here (names deduplicated case-insensitively). Ticket 15: putFood (edit,
-// either Member) and deleteFood (also removes every Member's Favorite of it). Recipes (19) add a
-// RECIPE# prefix and a `recipes` field on Library.
+// either Member) and deleteFood (also removes every Member's Favorite of it). Ticket 17: Recipes at
+// RECIPE#<id> and addRecipe (save to the Recipe Book); ticket 19 adds editing and deleting them.
 import { PutCommand, QueryCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { NUTRIENT_KEYS, editedFood, findFoodByName, foodFromServing, foodNameKey, type Food, type FoodEdit } from "@nutrisage/shared";
+import {
+  NUTRIENT_KEYS, checkRecipe, editedFood, findFoodByName, foodFromServing, foodNameKey, type Food, type FoodEdit, type NewRecipe, type Recipe,
+} from "@nutrisage/shared";
 import { UserError, invalid } from "../errors";
 import type { Estimate } from "../estimate";
-import { HOUSEHOLD_PK, TABLE, ddb, foodKey, memberPk, strip } from "../table";
+import { HOUSEHOLD_PK, TABLE, ddb, foodKey, memberPk, recipeKey, strip } from "../table";
 import type { ResolverModule } from "./types";
 
 /** Record cap against a scripted flood; far above what a household logs. Mutable for tests only. */
-export const LIBRARY_LIMITS = { foods: 2000 };
+export const LIBRARY_LIMITS = { foods: 2000, recipes: 500 };
 
-/** Every Food in the Library, in no particular order. */
-export async function listFoods(): Promise<Food[]> {
-  const out: Food[] = [];
+/** Every household row whose sort key starts with `prefix`. */
+async function listHousehold<T>(prefix: string): Promise<T[]> {
+  const out: T[] = [];
   let ExclusiveStartKey: Record<string, unknown> | undefined;
   do {
     const r = await ddb().send(
       new QueryCommand({
         TableName: TABLE,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :p)",
-        ExpressionAttributeValues: { ":pk": HOUSEHOLD_PK, ":p": foodKey("") },
+        ExpressionAttributeValues: { ":pk": HOUSEHOLD_PK, ":p": prefix },
         ExclusiveStartKey,
       }),
     );
-    out.push(...(r.Items ?? []).map((i) => strip<Food>(i)));
+    out.push(...(r.Items ?? []).map((i) => strip<T>(i)));
     ExclusiveStartKey = r.LastEvaluatedKey;
   } while (ExclusiveStartKey);
   return out;
 }
+
+/** Every Food in the Library, in no particular order. */
+export const listFoods = () => listHousehold<Food>(foodKey(""));
+
+/** Every Recipe in the Recipe Book, in no particular order. */
+export const listRecipes = async (): Promise<Recipe[]> =>
+  (await listHousehold<Recipe>(recipeKey(""))).map((r) => ({ ...r, preparedGrams: r.preparedGrams ?? null }));
 
 /**
  * Save an estimate as a Library Food, per gram with its units, unless a Food with the same name
@@ -63,6 +72,39 @@ const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 function foodId(v: unknown): string {
   if (typeof v !== "string" || !ID_RE.test(v)) throw invalid("bad Food id");
   return v;
+}
+
+function recipeId(v: unknown): string {
+  if (typeof v !== "string" || !ID_RE.test(v)) throw invalid("bad Recipe id");
+  return v;
+}
+
+/**
+ * Save a new Recipe to the Recipe Book under the id the client chose (so the Entry logged from it
+ * can point at it straight away). Saving an id that's already there returns that Recipe unchanged,
+ * so a retry is harmless. Names are unique in the Recipe Book, ignoring case and spacing.
+ */
+async function addRecipe(username: string, id: string, input: unknown): Promise<Recipe> {
+  const r = checkRecipe((input ?? {}) as NewRecipe);
+  if (!r.ok) throw invalid(r.error);
+  const all = await listRecipes();
+  const existing = all.find((x) => x.id === id);
+  if (existing) return existing;
+  const clash = all.find((x) => foodNameKey(x.name) === foodNameKey(r.recipe.name));
+  if (clash) throw invalid(`The Recipe Book already has ${clash.name}`);
+  if (all.length >= LIBRARY_LIMITS.recipes) throw invalid("The Recipe Book is full");
+  const recipe: Recipe = { id, ...r.recipe, createdBy: username, updatedAt: Date.now() };
+  try {
+    await ddb().send(
+      new PutCommand({ TableName: TABLE, Item: { PK: HOUSEHOLD_PK, SK: recipeKey(id), ...recipe }, ConditionExpression: "attribute_not_exists(PK)" }),
+    );
+  } catch (e) {
+    if ((e as Error).name !== "ConditionalCheckFailedException") throw e;
+    const now = (await listRecipes()).find((x) => x.id === id);
+    if (now) return now;
+    throw e;
+  }
+  return recipe;
 }
 
 /** The GraphQL FoodEditInput as a FoodEdit; editedFood does the real checks. */
@@ -124,11 +166,13 @@ export const library: ResolverModule = {
   Query: {
     /** The whole shared Library; the same for every Member. */
     async library() {
-      return { foods: await listFoods() };
+      const [foods, recipes] = await Promise.all([listFoods(), listRecipes()]);
+      return { foods, recipes };
     },
   },
   Mutation: {
     putFood: (_ctx, args) => putFood(foodId(args.id), args.input),
     deleteFood: (_ctx, args) => deleteFood(foodId(args.id)),
+    addRecipe: (ctx, args) => addRecipe(ctx.username, recipeId(args.id), args.input),
   },
 };

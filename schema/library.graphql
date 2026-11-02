@@ -22,9 +22,35 @@ type Food {
   updatedAt: Float!
 }
 
-"The household's whole Library. Recipes join with ticket 19."
+"One ingredient of a Recipe: an amount of a Food, snapshotted when it was added (shared/src/recipe.ts)."
+type RecipeIngredient {
+  "The Library item it came from, if any."
+  libraryId: ID
+  name: String!
+  amount: Float!
+  unit: String!
+  "Raw grams that went in, when known."
+  grams: Float
+  "Nutrition of that amount."
+  nutrition: Nutrition!
+  yieldRatio: Float
+}
+
+"A Recipe in the Recipe Book: ingredients plus an optional weighed Prepared weight."
+type Recipe {
+  id: ID!
+  name: String!
+  ingredients: [RecipeIngredient!]!
+  "Weighed Prepared weight of the finished batch in grams; null when not weighed."
+  preparedGrams: Float
+  createdBy: String!
+  updatedAt: Float!
+}
+
+"The household's whole Library: Foods and the Recipe Book."
 type Library {
   foods: [Food!]!
+  recipes: [Recipe!]!
 }
 
 extend type Query {
@@ -49,7 +75,25 @@ input FoodEditInput {
   yieldRatio: Float
 }
 
+input RecipeIngredientInput {
+  libraryId: ID
+  name: String!
+  amount: Float!
+  unit: String!
+  grams: Float
+  nutrition: NutritionInput!
+  yieldRatio: Float
+}
+
+input RecipeInput {
+  name: String!
+  ingredients: [RecipeIngredientInput!]!
+  preparedGrams: Float
+}
+
 extend type Mutation {
+  "Save a new Recipe to the Recipe Book under a client-chosen id. Saving an id that's already there returns that Recipe unchanged."
+  addRecipe(id: ID!, input: RecipeInput!): Recipe!
   "Edit a Library Food (either Member may). Entries logged from it keep their own snapshot."
   putFood(id: ID!, input: FoodEditInput!): Food!
   "Delete a Library Food and every Member's Favorite of it. Entries logged from it are untouched. Returns the id."

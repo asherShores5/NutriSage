@@ -29,6 +29,17 @@ export interface Entry {
   unit?: string | null;
   /** The Library item (Food or Recipe) it was logged from, if any. Only a pointer: the snapshot above is what counts. */
   libraryId?: string | null;
+  /** A Recipe Entry's ingredient breakdown for this portion (ticket 17), snapshotted like `nutrition`. */
+  ingredients?: EntryIngredient[] | null;
+}
+
+/** One ingredient of a logged Recipe portion: its share of what went in (shown when the Entry is expanded). */
+export interface EntryIngredient {
+  name: string;
+  nutrition: Nutrition;
+  grams?: number | null;
+  amount?: number | null;
+  unit?: string | null;
 }
 
 /** One Member's Day. The whole Day is written at once (last write wins per Day). */

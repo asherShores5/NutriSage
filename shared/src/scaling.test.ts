@@ -77,3 +77,27 @@ describe("an Entry's amount and units", () => {
     expect((r as { entry: object }).entry).not.toHaveProperty("grams");
   });
 });
+
+describe("rescaling a Recipe Entry", () => {
+  const n = (calories: number) => ({ carbs: 0, protein: 0, fat: 0, fiber: 0, sodium: 0, iron: 0, calories });
+  const chili: Entry = {
+    id: "r", meal: "dinner", name: "Chili", amount: 300, unit: "g", grams: 300, nutrition: n(400),
+    ingredients: [{ name: "Beef", grams: 100, amount: 100, unit: "g", nutrition: n(250) }, { name: "Beans", grams: 200, amount: 0.5, unit: "can", nutrition: n(150) }],
+  };
+
+  it("scales the ingredient breakdown with the portion, so it still adds up", () => {
+    const r = rescaleEntry(chili, { amount: 450, unit: "g" }, entryUnits(chili));
+    if (!r.ok) throw new Error(r.error);
+    expect(r.entry.nutrition.calories).toBe(600);
+    expect(r.entry.ingredients).toEqual([
+      { name: "Beef", grams: 150, amount: 150, unit: "g", nutrition: n(375) },
+      { name: "Beans", grams: 300, amount: 0.75, unit: "can", nutrition: n(225) },
+    ]);
+  });
+
+  it("a fraction-of-batch Entry with no grams rescales by fraction", () => {
+    const e: Entry = { ...chili, amount: 0.25, unit: "batch", grams: undefined };
+    const r = rescaleEntry(e, { amount: 0.5, unit: "batch" }, entryUnits(e));
+    expect(r.ok && r.entry.ingredients?.map((i) => i.nutrition.calories)).toEqual([500, 300]);
+  });
+});

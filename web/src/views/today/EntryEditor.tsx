@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   MEALS, MEAL_LABELS, entryAmount, entryUnits, formatAmount, isDateKey, parseAmount, rescaleEntry,
-  type Entry, type Meal,
+  type Entry, type EntryIngredient, type Meal,
 } from "@nutrisage/shared";
 import { AmountPicker } from "../../components/AmountPicker";
 
@@ -9,6 +9,7 @@ import { AmountPicker } from "../../components/AmountPicker";
  * Edit one Entry, opened from the Entry list. Ticket 04: delete. Ticket 05: amount and unit, which
  * rescale the snapshot as you type; bad input shows a message and leaves the Entry as it was.
  * Ticket 06: the Meal and Day pickers move it (amount and nutrition snapshot stay as they are).
+ * Ticket 17: a Recipe Entry shows its ingredient breakdown, which rescales with the portion.
  */
 export function EntryEditor({ entry, date, onChange, onMoveToDay, onDelete, onClose }: {
   entry: Entry;
@@ -46,6 +47,7 @@ export function EntryEditor({ entry, date, onChange, onMoveToDay, onDelete, onCl
 
   return (
     <div className="entry-editor" role="group" aria-label={`Edit ${entry.name}`}>
+      {entry.ingredients?.length ? <IngredientBreakdown entry={entry} /> : null}
       <AmountPicker amount={text} unit={current.unit} units={units.map((u) => u.label)} onAmount={(t) => apply(t, current.unit)} onUnit={switchUnit} />
       {error && <p className="error" role="alert">{error}</p>}
       <div className="entry-move">
@@ -65,5 +67,28 @@ export function EntryEditor({ entry, date, onChange, onMoveToDay, onDelete, onCl
         <button type="button" onClick={onClose}>Done</button>
       </div>
     </div>
+  );
+}
+
+/** What's in a Recipe Entry: each ingredient's share of this portion, from the snapshot taken at log time. */
+function IngredientBreakdown({ entry }: { entry: Entry }) {
+  const amount = (i: EntryIngredient) => {
+    const g = i.grams ? `${Math.round(i.grams)} g` : "";
+    if (!i.amount || !i.unit || i.unit === "g") return g;
+    return [`${formatAmount(i.amount)} ${i.unit}`, g].filter(Boolean).join(" · ");
+  };
+  return (
+    <section className="entry-ingredients" aria-label={`Ingredients of ${entry.name}`}>
+      <h4>Ingredients</h4>
+      <ul>
+        {entry.ingredients!.map((i, n) => (
+          <li key={n}>
+            <span>{i.name}</span>
+            <span>{amount(i)}</span>
+            <span>{Math.round(i.nutrition.calories)} cal</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

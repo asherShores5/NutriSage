@@ -18,13 +18,17 @@ export interface Estimate {
   food: Food | null;
 }
 
-/** Estimate one serving of `text`; it is saved to the Library too (a Guest's own, on this device). */
-export async function estimate(text: string): Promise<Estimate> {
+/**
+ * Estimate one serving of `text`; it is saved to the Library too (a Guest's own, on this device).
+ * `ingredient` (the Recipe builder) also asks for the Food's Yield ratio.
+ */
+export async function estimate(text: string, opts: { ingredient?: boolean } = {}): Promise<Estimate> {
+  const ingredient = opts.ingredient === true;
   if (isGuest()) {
-    const est = await guestEstimate(text);
+    const est = await guestEstimate(text, { ingredient });
     const units = Array.isArray(est.units) ? est.units : [];
     return { ...est, units, food: addGuestFood({ ...est, units }) };
   }
-  const q = `mutation($text: String!) { estimate(text: $text) { name nutrition { ${NUTRITION} } servingGrams yieldRatio units { label grams } food { ${FOOD} } } }`;
-  return (await gql<{ estimate: Estimate }>(q, { text })).estimate;
+  const q = `mutation($text: String!, $ingredient: Boolean) { estimate(text: $text, ingredient: $ingredient) { name nutrition { ${NUTRITION} } servingGrams yieldRatio units { label grams } food { ${FOOD} } } }`;
+  return (await gql<{ estimate: Estimate }>(q, { text, ...(ingredient ? { ingredient } : {}) })).estimate;
 }

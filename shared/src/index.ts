@@ -9,6 +9,7 @@ export * from "./goals";
 export * from "./guest";
 export * from "./mealWindows";
 export * from "./nutrients";
+export * from "./recipe";
 export * from "./scaling";
 export * from "./search";
 export * from "./trends";

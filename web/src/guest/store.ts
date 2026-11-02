@@ -1,8 +1,8 @@
 // A Guest's data, in this browser's storage only (spec: Guest access). Nothing here talks to a
-// server. Shape: { days: { [date]: Day }, library: Food[], goals: Goals }.
+// server. Shape: { days: { [date]: Day }, library: Food[], recipes: Recipe[], goals: Goals }.
 import {
-  GUEST_CREATOR, NUTRIENT_KEYS, defaultGoals, editedFood, findFoodByName, foodFromServing, foodNameKey, guestSeed,
-  type Day, type Food, type FoodEdit, type Goals, type ServingInput,
+  GUEST_CREATOR, NUTRIENT_KEYS, checkRecipe, defaultGoals, editedFood, findFoodByName, foodFromServing, foodNameKey, guestSeed,
+  type Day, type Food, type FoodEdit, type Goals, type NewRecipe, type Recipe, type ServingInput,
 } from "@nutrisage/shared";
 
 const KEY = "nutrisage.guest.data";
@@ -10,6 +10,8 @@ const KEY = "nutrisage.guest.data";
 interface GuestData {
   days: Record<string, Day>;
   library: Food[];
+  /** The Guest's own Recipe Book (ticket 17). */
+  recipes: Recipe[];
   goals: Goals;
 }
 
@@ -22,11 +24,16 @@ function asFood(f: any): Food {
 function read(): GuestData {
   try {
     const d = JSON.parse(localStorage.getItem(KEY) ?? "null");
-    if (d && typeof d === "object") return { days: d.days ?? {}, library: (Array.isArray(d.library) ? d.library : []).map(asFood), goals: { ...defaultGoals(), ...d.goals } };
+    if (d && typeof d === "object") {
+      return {
+        days: d.days ?? {}, library: (Array.isArray(d.library) ? d.library : []).map(asFood),
+        recipes: Array.isArray(d.recipes) ? d.recipes : [], goals: { ...defaultGoals(), ...d.goals },
+      };
+    }
   } catch {
     // unreadable: start over
   }
-  return { days: {}, library: [], goals: defaultGoals() };
+  return { days: {}, library: [], recipes: [], goals: defaultGoals() };
 }
 
 const write = (d: GuestData) => localStorage.setItem(KEY, JSON.stringify(d));
@@ -35,7 +42,7 @@ const write = (d: GuestData) => localStorage.setItem(KEY, JSON.stringify(d));
 export function seedGuestData(today: string) {
   if (localStorage.getItem(KEY)) return;
   const seed = guestSeed(today);
-  write({ days: Object.fromEntries(seed.days.map((d) => [d.date, d])), library: seed.library, goals: seed.goals });
+  write({ days: Object.fromEntries(seed.days.map((d) => [d.date, d])), library: seed.library, recipes: [], goals: seed.goals });
 }
 
 export function clearGuestData() {
@@ -99,6 +106,26 @@ export function deleteGuestFood(id: string): string {
   data.library = data.library.filter((f) => f.id !== id);
   write(data);
   return id;
+}
+
+/** The Guest's own Recipe Book. */
+export function guestRecipes(): Recipe[] {
+  return read().recipes;
+}
+
+/** Save a new Recipe to the Guest's device Recipe Book, like the Member `addRecipe` (same checks, same words). */
+export function addGuestRecipe(id: string, input: NewRecipe): Recipe {
+  const r = checkRecipe(input);
+  if (!r.ok) throw new Error(r.error);
+  const data = read();
+  const existing = data.recipes.find((x) => x.id === id);
+  if (existing) return existing;
+  const clash = data.recipes.find((x) => foodNameKey(x.name) === foodNameKey(r.recipe.name));
+  if (clash) throw new Error(`The Recipe Book already has ${clash.name}`);
+  const recipe: Recipe = { id, ...r.recipe, createdBy: GUEST_CREATOR, updatedAt: Date.now() };
+  data.recipes.push(recipe);
+  write(data);
+  return recipe;
 }
 
 /** The Guest's goals, like the Member `goals` query. */

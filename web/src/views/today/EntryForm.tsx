@@ -3,6 +3,7 @@ import { MEALS, MEAL_LABELS, NUTRIENTS, SERVING, logFood, parseAmount, searchLib
 import { estimate } from "../../api/estimate";
 import { AmountPicker } from "../../components/AmountPicker";
 import { rememberFood, useLibrary } from "../../library/useLibrary";
+import { RecipeBuilder } from "./RecipeBuilder";
 import { useMealPick } from "./useMealPick";
 import { blankNutrientValues, entryFromEstimate, formUnits, readEntryForm } from "./entryForm";
 
@@ -16,7 +17,8 @@ const plain = (e: unknown) => String((e as Error)?.message ?? e).replace(/^(Vali
  * chosen with the arrow keys, is "picked": the unit picker offers its units and Enter logs it.
  * With nothing picked, Enter (or Estimate) asks Bedrock for one serving's nutrition, saves it to the
  * Library and logs it scaled to the amount. "Type nutrition by hand" switches to typing one
- * serving's numbers yourself (servings only, no gram weight).
+ * serving's numbers yourself (servings only, no gram weight). "Build a Recipe" opens the Recipe
+ * builder (ticket 17) on its own screen; what it logs comes back through `onAdd`.
  */
 export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void }) {
   const [name, setName] = useState("");
@@ -27,6 +29,7 @@ export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void
   const [unit, setUnit] = useState<string>(SERVING);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [building, setBuilding] = useState(false);
   const { foods } = useLibrary();
   // Ticket 14 passes the Member's Favorite ids here ({ favoriteIds }) so they rank first.
   const hits = useMemo(() => (byHand ? [] : searchLibrary(foods, name)), [foods, name, byHand]);
@@ -165,8 +168,10 @@ export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void
         <button type="button" className="link" onClick={() => { setByHand(!byHand); setUnit(SERVING); setCursor(undefined); setError(undefined); }}>
           {byHand ? "Estimate instead" : "Type nutrition by hand"}
         </button>
+        <button type="button" className="link" onClick={() => setBuilding(true)}>Build a Recipe</button>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
+      {building && <RecipeBuilder meal={meal} onClose={() => setBuilding(false)} onLog={(entry) => { setBuilding(false); onAdd(entry); }} />}
     </form>
   );
 }

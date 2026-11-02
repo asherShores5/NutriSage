@@ -76,6 +76,11 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   A Day write always carries the whole Day (Entries, water, weight): last write wins per Day.
   Goals live at `MEMBER#<username>` / `GOALS` (0 = no goal; water defaults to 8 cups). Weight is > 0 or null
   (the old app's 0 meant not logged); water is whole cups.
+- **Recipes** (`shared/src/recipe.ts`, ticket 17): `HOUSEHOLD` / `RECIPE#<id>` beside `FOOD#<id>`; the id is chosen by the
+  client (`addRecipe(id, input)`, a retry returns the saved one) so the Entry can point at it at once. Ingredients are
+  snapshots (name, amount, unit, grams, nutrition, Yield ratio), not live links. A Recipe Entry carries `ingredients`
+  (its breakdown for that portion), which `rescaleEntry` scales with it. Logging in g needs the weighed Prepared weight
+  until ticket 18 estimates it; a fraction of the batch (unit `batch`) never does. The builder is a portal over Today.
 - **Two allowlists**: Cognito has no self sign-up, and the Lambda also refuses any username not in
   `ALLOWED_USERNAMES` (`USERNAMES` in `infra/lib/stacks.ts`), even with a valid token.
 - **Passkeys** (Cognito native, USER_AUTH): the relying party is `APP_DOMAIN`, so a passkey only
