@@ -71,6 +71,7 @@ await c.check("the previous-Day arrow shows yesterday with the moved Entry under
   await expect(entries.getByRole("group", { name: "Dinner" }).getByText("Burrito bowl")).toBeVisible();
   await expect(entries.getByRole("group", { name: "Dinner" }).getByText("680 cal").first()).toBeVisible();
   await expect(p.getByRole("region", { name: "Progress" }).locator('[data-nutrient="calories"] .bar-value')).toHaveText("680 cal");
+  await expect(p.getByLabel("Yesterday's weight")).toBeVisible(); // not "Today's weight" on a past Day
 });
 
 await c.check("deletes an Entry from its editor", async () => {

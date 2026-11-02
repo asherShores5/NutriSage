@@ -150,3 +150,9 @@ export function dayLabel(date: string, today: string): string {
   const sameYear = date.slice(0, 4) === today.slice(0, 4);
   return utc(date).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
 }
+
+/** The weight box's label for a Day: "Today's weight", "Yesterday's weight", else "Weight on Wed, Oct 28". */
+export function weightLabel(date: string, today: string): string {
+  const day = dayLabel(date, today);
+  return ["Today", "Yesterday", "Tomorrow"].includes(day) ? `${day}'s weight` : `Weight on ${day}`;
+}

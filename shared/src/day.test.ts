@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MEALS, MEAL_LABELS, dateKey, entriesByMeal, isDateKey, mergeDays, moveEntry, shiftDate, dayLabel, type Day, type Entry } from "./day";
+import { MEALS, MEAL_LABELS, dateKey, entriesByMeal, isDateKey, mergeDays, moveEntry, shiftDate, dayLabel, weightLabel, type Day, type Entry } from "./day";
 
 describe("Meals", () => {
   it("are Breakfast, Lunch, Dinner, Dessert, Snack, in display order", () => {
@@ -118,5 +118,13 @@ describe("mergeDays (a Day changed here from an older copy, or none, meets the s
   it("is the local copy as is when the server has no Day", () => {
     const local = day([entry("p1", "Phone banana")], 2);
     expect(mergeDays(local, undefined, undefined)).toEqual(local);
+  });
+});
+
+describe("weightLabel (the weight box names the Day shown)", () => {
+  it("says today's, yesterday's or the date", () => {
+    expect(weightLabel("2026-11-02", "2026-11-02")).toBe("Today's weight");
+    expect(weightLabel("2026-11-01", "2026-11-02")).toBe("Yesterday's weight");
+    expect(weightLabel("2026-10-28", "2026-11-02")).toBe("Weight on Wed, Oct 28");
   });
 });
