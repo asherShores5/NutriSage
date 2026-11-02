@@ -21,6 +21,7 @@ Not a workspace, so CI never installs it.
     npx tsx trends.ts          # Trends gaps: no data on unlogged Days, dashed bridges, today in progress
     npx tsx trendsYAxis.ts     # Trends Y-axis: fit, from 0, manual min/max; goal line (water goal; none for weight)
     npx tsx trendsRange.ts     # Trends range: presets, custom start/end, weekly averages over ~90 days, one query each
+    npx tsx trendsSecond.ts    # Trends second metric: right-hand axis with its own bounds, color and legend; goal stays primary
     npx tsx guest.ts           # Guest mode: demo data, capped estimates (cap 2 here), leave Guest mode
     npx tsx passkeys.ts        # add a passkey, sign in with it (virtual authenticator), password backup
     npx tsx mealWindows.ts     # Meal windows (faked clock): guess on open, a pick sticks, rollover, Profile edit
