@@ -2,11 +2,12 @@
 // Screenshots in $OUT/tour-* (see lib.ts). Look at them; DOM checks miss layout bugs.
 import type { Page } from "playwright";
 import { launch, todayKey } from "./app";
-import { graphql, seed } from "./backend";
+import { graphql, seed, seedLibrary } from "./backend";
 import { lastDays } from "../shared/src/week";
 import { OUT, shot, tab } from "./lib";
 
 await seed(todayKey());
+await seedLibrary([{ name: "Chicken breast" }, { name: "Chicken thigh" }, { name: "Chickpeas" }]);
 // A few past Days (gaps included) so Week and Trends have a streak and a line to show.
 for (const [i, date] of lastDays(todayKey(), 21).slice(0, -1).entries()) {
   if (i % 5 === 3) continue;
@@ -45,8 +46,14 @@ async function sweep(p: Page, name: string) {
   await p.waitForTimeout(200);
   await shot(p, `tour-${name}-03e-trends-second-metric`);
   await p.getByLabel("Compare with").selectOption("");
-  // Today's form switched to typing nutrition by hand.
+  // Fuzzy search matches under the add box (Chicken thigh picked with the arrow keys).
   await tab(p, "Today");
+  await p.getByLabel("Food").fill("chick");
+  await p.getByLabel("Food").press("ArrowDown");
+  await p.getByLabel("Food").press("ArrowDown");
+  await shot(p, `tour-${name}-01a-today-search`);
+  await p.getByLabel("Food").fill("");
+  // Today's form switched to typing nutrition by hand.
   await p.getByRole("button", { name: "Type nutrition by hand" }).click();
   await shot(p, `tour-${name}-01b-today-by-hand`);
   // An Entry's editor open.

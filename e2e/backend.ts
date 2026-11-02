@@ -191,3 +191,19 @@ export async function seed(date: string) {
   });
   await as("asher", "putGoals", { input: { carbs: 200, protein: 120, fat: 60, fiber: 30, sodium: 2300, iron: 10, calories: 2000, water: 8 } });
 }
+
+const { addEstimatedFood } = await import("../api/src/resolvers/library");
+
+/** Put Foods in the shared Library, as if `by` had estimated each one (nutrition is per serving). */
+export async function seedLibrary(foods: { name: string; servingGrams?: number | null; calories?: number }[], by = "asher") {
+  for (const f of foods) {
+    const food = await addEstimatedFood(by, {
+      name: f.name,
+      nutrition: { ...n(10, 10, 5, f.calories ?? 200) },
+      servingGrams: f.servingGrams ?? 100,
+      units: [],
+      yieldRatio: null,
+    });
+    if (!food) throw new Error(`seedLibrary: ${f.name} wasn't saved`);
+  }
+}
