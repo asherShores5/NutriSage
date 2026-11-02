@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MEAL_LABELS, entriesByMeal, sumMacros, type Entry, type EntryMove } from "@nutrisage/shared";
+import { MEAL_LABELS, entriesByMeal, entryAmountLabel, sumMacros, type Entry, type EntryMove } from "@nutrisage/shared";
 import { StarButton } from "../../components/StarButton";
 import { useFavorites } from "../../library/useFavorites";
 import { useLibrary } from "../../library/useLibrary";
@@ -9,7 +9,7 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * The Day's Entries grouped by Meal, in display order, each Meal with its calories. Tap an Entry to
- * edit it. An Entry logged from a Library item still in the Library has a star to make it a Favorite.
+ * edit it. Each row shows its amount and unit with its grams ("1 1/2 serving · 183 g"). An Entry logged from a Library item still in the Library has a star to make it a Favorite.
  */
 export function EntryList({ date, entries, empty, onChange, onMove, onDelete }: {
   /** The Day shown (YYYY-MM-DD). */
@@ -42,7 +42,7 @@ export function EntryList({ date, entries, empty, onChange, onMove, onDelete }: 
                   <span className="entry-main">
                     <span className="entry-name">
                       {e.name}
-                      {e.grams ? <span className="entry-grams">{Math.round(e.grams)} g</span> : null}
+                      <span className="entry-grams">{entryAmountLabel(e)}</span>
                     </span>
                     <span className="entry-macros">
                       {r1(e.nutrition.carbs)}c / {r1(e.nutrition.protein)}p / {r1(e.nutrition.fat)}f · {r1(e.nutrition.fiber)}g fiber · Na {r1(e.nutrition.sodium)}mg · Fe {r1(e.nutrition.iron)}mg

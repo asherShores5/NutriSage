@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Entry } from "./day";
-import { entryAmount, entryUnits, rescaleEntry, scaleSnapshot, servingUnits } from "./scaling";
+import { entryAmount, entryAmountLabel, entryUnits, rescaleEntry, scaleSnapshot, servingUnits } from "./scaling";
 
 const EGGS = { carbs: 1.2, protein: 12.6, fat: 10.1, fiber: 0, sodium: 342, iron: 1.7, calories: 180 };
 const one = { amount: 1, unit: "serving" };
@@ -99,5 +99,18 @@ describe("rescaling a Recipe Entry", () => {
     const e: Entry = { ...chili, amount: 0.25, unit: "batch", grams: undefined };
     const r = rescaleEntry(e, { amount: 0.5, unit: "batch" }, entryUnits(e));
     expect(r.ok && r.entry.ingredients?.map((i) => i.nutrition.calories)).toEqual([500, 300]);
+  });
+});
+
+describe("entryAmountLabel (what an Entry row says it holds)", () => {
+  it("is the amount and unit, then the grams when known", () => {
+    expect(entryAmountLabel({ amount: 1.5, unit: "serving", grams: 183.2 })).toBe("1 1/2 serving · 183 g");
+    expect(entryAmountLabel({ amount: 2, unit: "cup", grams: null })).toBe("2 cup");
+    expect(entryAmountLabel({ amount: 0.25, unit: "batch", grams: 300 })).toBe("1/4 batch · 300 g");
+  });
+
+  it("in g it's the grams once; a migrated Entry is 1 serving", () => {
+    expect(entryAmountLabel({ amount: 150, unit: "g", grams: 150 })).toBe("150 g");
+    expect(entryAmountLabel({})).toBe("1 serving");
   });
 });
