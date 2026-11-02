@@ -1,17 +1,23 @@
 import { useState } from "react";
-import { MEAL_LABELS, entriesByMeal, sumMacros, type Entry } from "@nutrisage/shared";
+import { MEAL_LABELS, entriesByMeal, sumMacros, type Entry, type EntryMove } from "@nutrisage/shared";
 import { EntryEditor } from "./EntryEditor";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /** The Day's Entries grouped by Meal, in display order, each Meal with its calories. Tap an Entry to edit it. */
-export function EntryList({ entries, onChange, onDelete }: {
+export function EntryList({ date, entries, empty, onChange, onMove, onDelete }: {
+  /** The Day shown (YYYY-MM-DD). */
+  date: string;
   entries: Entry[];
+  /** Shown when the Day has no Entries. */
+  empty: string;
   onChange: (entry: Entry) => void;
+  /** Move an Entry to another Day (Meal changes on the same Day go through `onChange`). */
+  onMove: (id: string, to: EntryMove & { date: string }) => void;
   onDelete: (id: string) => void;
 }) {
   const [open, setOpen] = useState<string>();
-  if (!entries.length) return <p className="empty">Nothing logged yet today.</p>;
+  if (!entries.length) return <p className="empty">{empty}</p>;
   return (
     <section className="entry-list" aria-label="Entries">
       {entriesByMeal(entries).map(([meal, list]) => (
@@ -38,7 +44,9 @@ export function EntryList({ entries, onChange, onDelete }: {
                 {open === e.id && (
                   <EntryEditor
                     entry={e}
+                    date={date}
                     onChange={onChange}
+                    onMoveToDay={(date) => { setOpen(undefined); onMove(e.id, { date }); }}
                     onDelete={() => { setOpen(undefined); onDelete(e.id); }}
                     onClose={() => setOpen(undefined)}
                   />

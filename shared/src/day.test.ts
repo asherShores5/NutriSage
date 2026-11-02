@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MEALS, MEAL_LABELS, dateKey, entriesByMeal, isDateKey } from "./day";
+import { MEALS, MEAL_LABELS, dateKey, entriesByMeal, isDateKey, moveEntry, shiftDate, dayLabel } from "./day";
 
 describe("Meals", () => {
   it("are Breakfast, Lunch, Dinner, Dessert, Snack, in display order", () => {
@@ -28,5 +28,57 @@ describe("dateKey", () => {
     expect(isDateKey("2026-02-30")).toBe(false);
     expect(isDateKey("2026-1-2")).toBe(false);
     expect(isDateKey("DAY#2026-11-02")).toBe(false);
+  });
+});
+
+describe("moveEntry", () => {
+  const n = (calories: number) => ({ carbs: 1, protein: 2, fat: 3, fiber: 4, sodium: 5, iron: 6, calories });
+  const lunch = { id: "e1", meal: "lunch" as const, name: "Burrito bowl", nutrition: n(680), grams: 450 };
+  const apple = { id: "e2", meal: "snack" as const, name: "Apple", nutrition: n(95) };
+  const today = { date: "2026-11-02", entries: [lunch, apple], water: 3, weight: 171.4, updatedAt: 5 };
+
+  it("to another Meal on the same Day changes only its Meal, keeping its place", () => {
+    const r = moveEntry(today, "e1", { meal: "dinner" });
+    expect(r).toEqual([{ ...today, entries: [{ ...lunch, meal: "dinner" }, apple] }]);
+  });
+
+  it("to another Day takes it off this Day and adds it to the end of that Day, amount and snapshot unchanged", () => {
+    const yesterday = { date: "2026-11-01", entries: [apple], water: 8, weight: null };
+    const [from, to] = moveEntry(today, "e1", { date: "2026-11-01" }, yesterday);
+    expect(from).toEqual({ ...today, entries: [apple] });
+    expect(to).toEqual({ ...yesterday, entries: [apple, lunch] });
+  });
+
+  it("to an unlogged Day starts that Day with just the Entry, and can change the Meal too", () => {
+    const [, to] = moveEntry(today, "e1", { date: "2026-10-30", meal: "breakfast" });
+    expect(to).toEqual({ date: "2026-10-30", entries: [{ ...lunch, meal: "breakfast" }], water: null, weight: null });
+  });
+
+  it("an unknown Entry or a move to where it already is changes nothing", () => {
+    expect(moveEntry(today, "nope", { meal: "dinner" })).toEqual([]);
+    expect(moveEntry(today, "e1", { meal: "lunch", date: "2026-11-02" })).toEqual([]);
+  });
+
+  it("refuses a date that isn't YYYY-MM-DD", () => {
+    expect(() => moveEntry(today, "e1", { date: "11/01/2026" })).toThrow("date");
+  });
+});
+
+describe("Day navigation", () => {
+  it("shiftDate steps whole calendar days across month and year ends", () => {
+    expect(shiftDate("2026-11-02", -1)).toBe("2026-11-01");
+    expect(shiftDate("2026-03-01", -1)).toBe("2026-02-28");
+    expect(shiftDate("2026-12-31", 1)).toBe("2027-01-01");
+    // The US clock change (Nov 1 2026) doesn't skip or repeat a Day.
+    expect(shiftDate("2026-10-31", 2)).toBe("2026-11-02");
+  });
+
+  it("dayLabel names today, yesterday and tomorrow, and spells out other dates", () => {
+    const today = "2026-11-02";
+    expect(dayLabel("2026-11-02", today)).toBe("Today");
+    expect(dayLabel("2026-11-01", today)).toBe("Yesterday");
+    expect(dayLabel("2026-11-03", today)).toBe("Tomorrow");
+    expect(dayLabel("2026-10-28", today)).toBe("Wed, Oct 28");
+    expect(dayLabel("2025-12-25", today)).toBe("Thu, Dec 25, 2025");
   });
 });

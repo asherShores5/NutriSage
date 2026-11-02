@@ -12,6 +12,7 @@ Not a workspace, so CI never installs it.
     cd e2e && npm install && npx playwright install chromium
     npx tsx today.ts           # walking skeleton: sign in, log an Entry, totals, persistence
     npx tsx parity.ts          # Today parity: Goals, every Meal incl. Dessert, bars, water, weight, theme
+    npx tsx move.ts            # move an Entry to another Meal and Day, delete one; Day navigation, Clear day
     npx tsx estimate.ts        # type a Food, log the (stubbed) Bedrock estimate
 <<<<<<< HEAD
     npx tsx week.ts            # Week streak/averages/total vs seeded Days; Trends metric chart

@@ -33,6 +33,10 @@ async function sweep(p: Page, name: string) {
   // An Entry's editor open.
   await p.getByRole("region", { name: "Entries" }).getByRole("button", { name: /Turkey sandwich/ }).click();
   await shot(p, `tour-${name}-01c-today-entry-editor`);
+  // Yesterday (Day navigation), away from today.
+  await p.getByRole("group", { name: "Day" }).getByRole("button", { name: "Previous Day" }).click();
+  await p.waitForTimeout(200);
+  await shot(p, `tour-${name}-01d-yesterday`);
 }
 
 await sweep(await app.open("asher"), "phone");

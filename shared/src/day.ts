@@ -54,3 +54,53 @@ export function isDateKey(s: unknown): s is string {
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
+
+/** Where an Entry moves: another Meal, another Day, or both. Leaving one out keeps it as is. */
+export interface EntryMove {
+  meal?: Meal;
+  date?: string;
+}
+
+/**
+ * Move an Entry to another Meal and/or Day (spec: moving changes only its Meal and/or Day; amount
+ * and nutrition snapshot stay). Returns the Days to write: `[day]` for a Meal change on the same
+ * Day, `[day, target]` for a Day change, `[]` if nothing changes. `target` is the destination Day
+ * as stored (absent when that date has nothing logged); the Entry goes on its end.
+ */
+export function moveEntry(day: Day, entryId: string, to: EntryMove, target?: Day): Day[] {
+  if (to.date !== undefined && !isDateKey(to.date)) throw new Error("date must be YYYY-MM-DD");
+  const entry = day.entries.find((e) => e.id === entryId);
+  if (!entry) return [];
+  const moved: Entry = { ...entry, meal: to.meal ?? entry.meal };
+  if (to.date === undefined || to.date === day.date) {
+    if (moved.meal === entry.meal) return [];
+    return [{ ...day, entries: day.entries.map((e) => (e.id === entryId ? moved : e)) }];
+  }
+  const dest = target ?? { date: to.date, entries: [], water: null, weight: null };
+  return [
+    { ...day, entries: day.entries.filter((e) => e.id !== entryId) },
+    { ...dest, entries: [...dest.entries, moved] },
+  ];
+}
+
+const utc = (date: string) => {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+};
+const keyOf = (dt: Date) => dt.toISOString().slice(0, 10);
+
+/** The date `delta` calendar days from `date` (both YYYY-MM-DD). Counted in UTC, so clock changes never skip a Day. */
+export function shiftDate(date: string, delta: number): string {
+  const dt = utc(date);
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return keyOf(dt);
+}
+
+/** Header text for a Day: Today, Yesterday, Tomorrow, else e.g. "Wed, Oct 28" (with the year when it isn't this year). */
+export function dayLabel(date: string, today: string): string {
+  if (date === today) return "Today";
+  if (date === shiftDate(today, -1)) return "Yesterday";
+  if (date === shiftDate(today, 1)) return "Tomorrow";
+  const sameYear = date.slice(0, 4) === today.slice(0, 4);
+  return utc(date).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+}
