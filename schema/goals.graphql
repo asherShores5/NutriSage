@@ -1,2 +1,35 @@
-# Goals and Meal windows (tickets 04, 07). Resolvers: api/src/resolvers/goals.ts.
-# Placeholder: add types here and fields with `extend type Query { ... }` / `extend type Mutation { ... }`.
+# Goals (ticket 04) and Meal windows (ticket 07). Resolvers: api/src/resolvers/goals.ts.
+
+"A Member's daily targets. 0 means no goal for that nutrient."
+type Goals {
+  carbs: Float!
+  protein: Float!
+  fat: Float!
+  fiber: Float!
+  sodium: Float!
+  iron: Float!
+  calories: Float!
+  "Cups of water per Day."
+  water: Float!
+}
+
+input GoalsInput {
+  carbs: Float!
+  protein: Float!
+  fat: Float!
+  fiber: Float!
+  sodium: Float!
+  iron: Float!
+  calories: Float!
+  water: Float!
+}
+
+extend type Query {
+  "The caller's goals (defaults until set: no nutrient goals, 8 cups of water)."
+  goals: Goals!
+}
+
+extend type Mutation {
+  "Replace the caller's goals."
+  putGoals(input: GoalsInput!): Goals!
+}

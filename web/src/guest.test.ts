@@ -33,6 +33,7 @@ async function launch() {
     session: await import("./session"),
     days: await import("./api/days"),
     estimate: await import("./api/estimate"),
+    goals: await import("./api/goals"),
   };
 }
 
@@ -83,6 +84,16 @@ describe("a Guest", () => {
     const again = await launch();
     again.session.enterGuest();
     expect((await again.days.getDays(today, today))[0].entries).toEqual([]);
+  });
+
+  it("has demo goals and keeps the goals they set, on this device only", async () => {
+    const { session, goals } = await launch();
+    session.enterGuest();
+    expect((await goals.getGoals()).calories).toBe(2000);
+    await goals.putGoals({ ...(await goals.getGoals()), calories: 1800 });
+    const again = await launch();
+    expect((await again.goals.getGoals()).calories).toBe(1800);
+    expect(requests).toEqual([]);
   });
 
   it("estimates through the Guest endpoint, never the Member API", async () => {

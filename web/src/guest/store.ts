@@ -1,22 +1,23 @@
 // A Guest's data, in this browser's storage only (spec: Guest access). Nothing here talks to a
-// server. Shape: { days: { [date]: Day }, library: GuestFood[] }.
-import { guestSeed, type Day, type GuestFood } from "@nutrisage/shared";
+// server. Shape: { days: { [date]: Day }, library: GuestFood[], goals: Goals }.
+import { defaultGoals, guestSeed, type Day, type Goals, type GuestFood } from "@nutrisage/shared";
 
 const KEY = "nutrisage.guest.data";
 
 interface GuestData {
   days: Record<string, Day>;
   library: GuestFood[];
+  goals: Goals;
 }
 
 function read(): GuestData {
   try {
     const d = JSON.parse(localStorage.getItem(KEY) ?? "null");
-    if (d && typeof d === "object") return { days: d.days ?? {}, library: d.library ?? [] };
+    if (d && typeof d === "object") return { days: d.days ?? {}, library: d.library ?? [], goals: { ...defaultGoals(), ...d.goals } };
   } catch {
     // unreadable: start over
   }
-  return { days: {}, library: [] };
+  return { days: {}, library: [], goals: defaultGoals() };
 }
 
 const write = (d: GuestData) => localStorage.setItem(KEY, JSON.stringify(d));
@@ -25,7 +26,7 @@ const write = (d: GuestData) => localStorage.setItem(KEY, JSON.stringify(d));
 export function seedGuestData(today: string) {
   if (localStorage.getItem(KEY)) return;
   const seed = guestSeed(today);
-  write({ days: Object.fromEntries(seed.days.map((d) => [d.date, d])), library: seed.library });
+  write({ days: Object.fromEntries(seed.days.map((d) => [d.date, d])), library: seed.library, goals: seed.goals });
 }
 
 export function clearGuestData() {
@@ -51,4 +52,17 @@ export function putGuestDay(day: Day): Day {
 /** The demo Library (for the Library screens, M2). The household Library is never shown to a Guest. */
 export function guestLibrary(): GuestFood[] {
   return read().library;
+}
+
+/** The Guest's goals, like the Member `goals` query. */
+export function guestGoals(): Goals {
+  return read().goals;
+}
+
+/** Replace the Guest's goals, like the Member `putGoals`. */
+export function putGuestGoals(goals: Goals): Goals {
+  const data = read();
+  data.goals = { ...goals };
+  write(data);
+  return data.goals;
 }

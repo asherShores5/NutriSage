@@ -34,6 +34,20 @@ function validateEntry(e: unknown): Entry {
   return { id: src.id, meal: src.meal as Entry["meal"], name, nutrition: validateNutrition(src.nutrition), ...(grams === null ? {} : { grams }) };
 }
 
+/** Whole cups, or null for none logged. */
+function validateWater(v: unknown): number | null {
+  const cups = optionalIn(v, DAY_LIMITS.water, "water");
+  if (cups !== null && !Number.isInteger(cups)) throw invalid("water must be a whole number of cups");
+  return cups;
+}
+
+/** Once-per-Day weight, more than 0, or null for not logged (the old app wrote 0 for that). */
+function validateWeight(v: unknown): number | null {
+  const w = optionalIn(v, DAY_LIMITS.weight, "weight");
+  if (w === 0) throw invalid("weight must be more than 0; clear it instead");
+  return w;
+}
+
 export function validateDayInput(input: unknown): Omit<Day, "updatedAt"> {
   const src = (input ?? {}) as Record<string, unknown>;
   if (!isDateKey(src.date)) throw invalid("date must be YYYY-MM-DD");
@@ -44,8 +58,8 @@ export function validateDayInput(input: unknown): Omit<Day, "updatedAt"> {
   return {
     date: src.date,
     entries,
-    water: optionalIn(src.water, DAY_LIMITS.water, "water"),
-    weight: optionalIn(src.weight, DAY_LIMITS.weight, "weight"),
+    water: validateWater(src.water),
+    weight: validateWeight(src.weight),
   };
 }
 

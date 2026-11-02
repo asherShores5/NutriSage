@@ -35,6 +35,10 @@ describe("a Guest's demo data", () => {
     expect(seed.library.find((f) => f.name === "Apple")).toMatchObject({ nutrition: { carbs: 25, calories: 95 } });
   });
 
+  it("has demo goals for every nutrient and water", () => {
+    expect(seed.goals).toEqual({ carbs: 220, protein: 130, fat: 70, fiber: 30, sodium: 2300, iron: 18, calories: 2000, water: 8 });
+  });
+
   it("is the same every time for the same day", () => {
     expect(guestSeed("2026-03-03")).toEqual(seed);
   });

@@ -52,14 +52,15 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   `schema/compose.ts` merges them into one document for AppSync and the e2e backend.
 - `api/src/`: `handler.ts` (Member allowlist, then dispatch by field name), `table.ts` (key layout,
   document client seam), `resolvers/<entity>.ts` (one `ResolverModule` per entity, merged in
-  `resolvers/index.ts`). Placeholders exist for goals, favorites, library and estimate: fill the
-  file, no index edit needed.
+  `resolvers/index.ts`). Placeholders exist for favorites and library: fill the file, no index edit needed.
 - `infra/lib/`: `stacks.ts` (AppStack: table, Cognito, AppSync + Lambda), `app.ts` (wires stacks;
   ticket 11 adds Cert/Web/Ci). An AppSync resolver is created for every Query/Mutation field in the
   composed schema, so a new field needs only its schema line and its resolver.
 - `web/src/`: `auth.ts` (Cognito JSON API), `config.ts` (runtime `/config.json`), `api/<entity>.ts`
-  (GraphQL calls), `tabs.ts` (bottom tab registry), `views/<tab>/` (one folder per tab with its own
-  components and CSS: today, week, trends, goals, profile). `sw/sw.ts` + `src/swShell.ts`: the
+  (GraphQL calls), `tabs.ts` (bottom tab registry), `components/` (shared by tabs, e.g. `Bars`), `views/<tab>/` (one folder per tab with its own
+  components and CSS: today, week, trends, goals, profile). Today is split into `EntryForm` (add box),
+  `EntryList` + `EntryEditor`, `Water`, `Weight`, and `components/Bars`; `views/goals/useGoals.ts` is the
+  in-memory goals store both Today and Goals read. Theme: `src/theme.ts` + pre-paint `public/theme.js` (no inline scripts under the CSP). `sw/sw.ts` + `src/swShell.ts`: the
   hand-rolled service worker built by `vite.config.ts`.
 - `e2e/`: Playwright against an in-process fake backend (`backend.ts`: the real handler on
   `api/src/testing/fakeDynamo.ts`, fake Cognito), launcher `app.ts`, helpers `lib.ts`.
@@ -71,6 +72,8 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
 - **Data keys**: `MEMBER#<username>` / `DAY#YYYY-MM-DD` for a Member's Day; `HOUSEHOLD` for the
   shared Library. Partitions use the Cognito username (admin-created, allowlisted), not the sub.
   A Day write always carries the whole Day (Entries, water, weight): last write wins per Day.
+  Goals live at `MEMBER#<username>` / `GOALS` (0 = no goal; water defaults to 8 cups). Weight is > 0 or null
+  (the old app's 0 meant not logged); water is whole cups.
 - **Two allowlists**: Cognito has no self sign-up, and the Lambda also refuses any username not in
   `ALLOWED_USERNAMES` (`USERNAMES` in `infra/lib/stacks.ts`), even with a valid token.
 - **Passkeys** (Cognito native, USER_AUTH): the relying party is `APP_DOMAIN`, so a passkey only

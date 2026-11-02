@@ -1,6 +1,7 @@
 // A Guest's demo data (spec: Guest access): seeded into browser storage on first open so the app
 // isn't empty. Ported from the old app's seedGuestDataIfEmpty (same menu and pattern).
 import type { Day, Meal } from "./day";
+import type { Goals } from "./goals";
 import type { Nutrition } from "./nutrients";
 
 /** A Food in a Guest's demo Library: one serving's nutrition. */
@@ -36,11 +37,14 @@ export interface GuestSeed {
   /** Oldest first. */
   days: Day[];
   library: GuestFood[];
+  goals: Goals;
 }
+
+const DEMO_GOALS: Goals = { carbs: 220, protein: 130, fat: 70, fiber: 30, sodium: 2300, iron: 18, calories: 2000, water: 8 };
 
 /**
  * Demo Days for the 10 days ending `today` (YYYY-MM-DD), skipping every fourth so streaks and
- * gaps show, each with three Entries, water and a weight; plus the demo Library.
+ * gaps show, each with three Entries, water and a weight; plus the demo Library and goals.
  */
 export function guestSeed(today: string): GuestSeed {
   const days: Day[] = [];
@@ -53,5 +57,5 @@ export function guestSeed(today: string): GuestSeed {
     });
     days.push({ date, entries, water: 4 + (i % 5), weight: Math.round((165 - i * 0.2) * 10) / 10 });
   }
-  return { days, library: MENU.map((f) => ({ ...f, nutrition: { ...f.nutrition } })) };
+  return { days, library: MENU.map((f) => ({ ...f, nutrition: { ...f.nutrition } })), goals: { ...DEMO_GOALS } };
 }

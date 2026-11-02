@@ -11,6 +11,7 @@ Not a workspace, so CI never installs it.
     npm run build:web          # repo root
     cd e2e && npm install && npx playwright install chromium
     npx tsx today.ts           # walking skeleton: sign in, log an Entry, totals, persistence
+    npx tsx parity.ts          # Today parity: Goals, every Meal incl. Dessert, bars, water, weight, theme
     npx tsx estimate.ts        # type a Food, log the (stubbed) Bedrock estimate
     npx tsx guest.ts           # Guest mode: demo data, capped estimates (cap 2 here), leave Guest mode
     npx tsx passkeys.ts        # add a passkey, sign in with it (virtual authenticator), password backup
