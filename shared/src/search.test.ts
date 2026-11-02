@@ -86,13 +86,15 @@ describe("enterMatch (what Enter logs in the add box)", () => {
     expect(enter("chik brst")).toBe("Chicken breast");
     expect(enter("chiken breast")).toBe("Chicken breast");
     expect(enter("Greek yoghurt")).toBe("Greek yogurt");
-    expect(enter("eggs scrambled")).toBe("2 eggs scrambled"); // a count in the name or the text is the amount
+    expect(enter("2 eggs scrambled")).toBe("2 eggs scrambled");
     expect(enter("2 chik brst")).toBe("Chicken breast");
   });
 
   it("estimates instead when part of the name wasn't typed: 'apple' isn't Apple pie", () => {
     expect(enter("apple")).toBeUndefined();
     expect(enter("chicken")).toBeUndefined();
+    // A number in the name is part of it: "Pear 2" isn't the Pear 1 already in the Library.
+    expect(enterMatch(searchLibrary([item("p1", "Pear 1")], "Pear 2"))).toBeUndefined();
   });
 
   it("estimates when the text names more than the match: 'chicken breast sandwich'", () => {

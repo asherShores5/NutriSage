@@ -17,7 +17,7 @@ export interface SearchHit<T extends Searchable> {
   whole: boolean;
   /**
    * The text covers the name: every word of the name is matched by a typed word and every typed
-   * word by a word of the name (partial words and typos allowed, counts aside). "chik brst" covers
+   * word by a word of the name (partial words and typos allowed; a typed count is the amount, a number in the name must be typed). "chik brst" covers
    * Chicken breast; "apple" doesn't cover Apple pie, nor "chicken breast sandwich" Chicken breast.
    */
   covers: boolean;
@@ -90,9 +90,11 @@ const isCount = (w: string) => /^[0-9]+$/.test(w);
 
 /** Whether the typed words cover the name's words, both ways (see SearchHit.covers). */
 function coversName(query: string[], name: string[]): boolean {
+  // A typed count ("2 chik brst") is the amount; a number in the name is part of the name.
   const q = query.filter((w) => !isCount(w));
   const n = name.filter((w) => !isCount(w));
   if (!q.length || !n.length) return false;
+  if (name.some((w) => isCount(w) && !query.includes(w))) return false;
   return n.every((w) => q.some((x) => wordScore(x, w) > 0)) && q.every((x) => n.some((w) => wordScore(x, w) > 0));
 }
 
