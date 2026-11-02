@@ -21,6 +21,9 @@ async function sweep(p: Page, name: string) {
   await tab(p, "Today");
   await p.getByRole("button", { name: "Type nutrition by hand" }).click();
   await shot(p, `tour-${name}-01b-today-by-hand`);
+  // An Entry's editor open.
+  await p.getByRole("region", { name: "Entries" }).getByRole("button", { name: /Turkey sandwich/ }).click();
+  await shot(p, `tour-${name}-01c-today-entry-editor`);
 }
 
 await sweep(await app.open("asher"), "phone");

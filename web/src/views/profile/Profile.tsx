@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { currentUsername, listPasskeys, registerPasskey, signOut } from "../../auth";
+import { ThemePicker } from "./ThemePicker";
 
-/** The Profile tab: who's signed in, passkeys and sign out. Theme (04) and Meal windows (07) land here. */
+/** The Profile tab: who's signed in, theme, passkeys and sign out. Meal windows (07) land here. */
 export function Profile() {
   return (
     <div className="profile">
       <h2>Profile</h2>
       <p>Signed in as <strong>{currentUsername()}</strong></p>
+      <ThemePicker />
       <Passkeys />
       <button onClick={() => void signOut()}>Sign out</button>
     </div>

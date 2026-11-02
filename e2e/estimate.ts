@@ -21,8 +21,7 @@ await c.check("typing a Food and pressing Enter logs an estimated Entry with its
   await expect(entries.getByText("2 eggs scrambled")).toBeVisible();
   await expect(entries.getByRole("heading", { name: "Breakfast" })).toBeVisible();
   await expect(entries.getByText("122 g")).toBeVisible();
-  const totals = p.getByRole("region", { name: "Totals" });
-  await expect(totals.locator(".total", { hasText: "Calories" }).locator(".total-value")).toHaveText("182");
+  await expect(p.getByRole("region", { name: "Progress" }).locator('[data-nutrient="calories"] .bar-value')).toHaveText("182 cal");
   await expect(form.getByLabel("Food")).toHaveValue("");
   await expect.poll(() => (lastCall("putDay")?.args as any)?.input?.entries?.[0]?.grams).toBe(122);
   if ((lastCall("estimate")?.args as any)?.text !== "2 eggs scrambled") throw new Error("estimate not called with the typed text");

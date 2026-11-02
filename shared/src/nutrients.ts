@@ -6,7 +6,7 @@ export const NUTRIENTS = [
   { key: "carbs", label: "Carbs", unit: "g", group: "macro" },
   { key: "protein", label: "Protein", unit: "g", group: "macro" },
   { key: "fat", label: "Fat", unit: "g", group: "macro" },
-  { key: "fiber", label: "Fiber", unit: "g", group: "micro" },
+  { key: "fiber", label: "Fiber", unit: "g", group: "macro" },
   { key: "sodium", label: "Sodium", unit: "mg", group: "micro" },
   { key: "iron", label: "Iron", unit: "mg", group: "micro" },
   { key: "calories", label: "Calories", unit: "cal", group: "macro" },
