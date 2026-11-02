@@ -1,2 +1,33 @@
 # The shared Library: Foods and Recipes (tickets 12, 15, 19). Resolvers: api/src/resolvers/library.ts.
-# Placeholder: add types here and fields with `extend type Query { ... }` / `extend type Mutation { ... }`.
+# Shared by every Member (HOUSEHOLD partition); Guests never reach it.
+
+"A named unit of a Food and the gram weight of one of it (serving, g, egg, cup...)."
+type FoodUnit {
+  label: String!
+  grams: Float!
+}
+
+"A single Library item with known nutrition per unit (shared/src/food.ts)."
+type Food {
+  id: ID!
+  name: String!
+  "Nutrition in one gram; in one serving when the Food has no g unit (its serving weight is unknown)."
+  nutrition: Nutrition!
+  "serving first, then g when weighed, then any others."
+  units: [FoodUnit!]!
+  yieldRatio: Float
+  "Username of the Member who first saved it."
+  createdBy: String!
+  "Epoch ms of the last write."
+  updatedAt: Float!
+}
+
+"The household's whole Library. Recipes join with ticket 19."
+type Library {
+  foods: [Food!]!
+}
+
+extend type Query {
+  "The shared Library: the same for every Member."
+  library: Library!
+}

@@ -1,19 +1,28 @@
 // A Guest's data, in this browser's storage only (spec: Guest access). Nothing here talks to a
-// server. Shape: { days: { [date]: Day }, library: GuestFood[], goals: Goals }.
-import { defaultGoals, guestSeed, type Day, type Goals, type GuestFood } from "@nutrisage/shared";
+// server. Shape: { days: { [date]: Day }, library: Food[], goals: Goals }.
+import {
+  GUEST_CREATOR, NUTRIENT_KEYS, defaultGoals, findFoodByName, foodFromServing, guestSeed,
+  type Day, type Food, type Goals, type ServingInput,
+} from "@nutrisage/shared";
 
 const KEY = "nutrisage.guest.data";
 
 interface GuestData {
   days: Record<string, Day>;
-  library: GuestFood[];
+  library: Food[];
   goals: Goals;
+}
+
+/** A stored Library item as a Food. Devices seeded before ticket 12 hold one serving's nutrition and no units. */
+function asFood(f: any): Food {
+  if (Array.isArray(f?.units)) return f as Food;
+  return { id: String(f?.id), ...foodFromServing({ name: String(f?.name ?? ""), nutrition: f?.nutrition ?? {}, servingGrams: null }), createdBy: GUEST_CREATOR, updatedAt: 0 };
 }
 
 function read(): GuestData {
   try {
     const d = JSON.parse(localStorage.getItem(KEY) ?? "null");
-    if (d && typeof d === "object") return { days: d.days ?? {}, library: d.library ?? [], goals: { ...defaultGoals(), ...d.goals } };
+    if (d && typeof d === "object") return { days: d.days ?? {}, library: (Array.isArray(d.library) ? d.library : []).map(asFood), goals: { ...defaultGoals(), ...d.goals } };
   } catch {
     // unreadable: start over
   }
@@ -49,9 +58,24 @@ export function putGuestDay(day: Day): Day {
   return saved;
 }
 
-/** The demo Library (for the Library screens, M2). The household Library is never shown to a Guest. */
-export function guestLibrary(): GuestFood[] {
+/** The Guest's own Library: the demo Foods plus what they estimated. The household Library is never shown to a Guest. */
+export function guestLibrary(): Food[] {
   return read().library;
+}
+
+/**
+ * Save an estimate to the Guest's device Library, like the Member estimate does on the server:
+ * an existing Food with the same name (ignoring case) is returned instead; all-zero estimates aren't saved.
+ */
+export function addGuestFood(est: ServingInput): Food | null {
+  if (NUTRIENT_KEYS.every((k) => !Number(est.nutrition[k]))) return null;
+  const data = read();
+  const existing = findFoodByName(data.library, est.name);
+  if (existing) return existing;
+  const food: Food = { id: crypto.randomUUID(), ...foodFromServing(est), createdBy: GUEST_CREATOR, updatedAt: Date.now() };
+  data.library.push(food);
+  write(data);
+  return food;
 }
 
 /** The Guest's goals, like the Member `goals` query. */

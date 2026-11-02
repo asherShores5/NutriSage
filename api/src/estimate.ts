@@ -6,7 +6,7 @@
 // (the bare model ID can't be invoked on demand). Keep a Sonnet-class model: estimates are mostly
 // recall of branded and restaurant items, where Haiku underestimated portions.
 import { BedrockRuntimeClient, ConverseCommand, type ConverseCommandOutput } from "@aws-sdk/client-bedrock-runtime";
-import { NUTRIENT_KEYS, type Nutrition } from "@nutrisage/shared";
+import { GRAMS, NUTRIENT_KEYS, SERVING, type FoodUnit, type Nutrition } from "@nutrisage/shared";
 import { UserError, invalid } from "./errors";
 
 export const ESTIMATE_LIMITS = {
@@ -18,6 +18,9 @@ export const ESTIMATE_LIMITS = {
   servingGrams: 10_000,
   /** Believable Yield ratios (dry rice is about 2.5, raw chicken about 0.75). */
   yieldRatio: { min: 0.05, max: 20 },
+  /** At most this many suggested units, each label at most unitLength characters. */
+  units: 6,
+  unitLength: 30,
 } as const;
 
 /** What Bedrock thinks one serving of a food holds. */
@@ -30,6 +33,8 @@ export interface Estimate {
   servingGrams: number | null;
   /** Raw-to-prepared weight ratio, only when asked about a recipe ingredient; else null. */
   yieldRatio: number | null;
+  /** Other common units for this food (e.g. egg, cup, slice) with the gram weight of one; may be empty. */
+  units: FoodUnit[];
 }
 
 export interface EstimateOptions {
@@ -52,6 +57,7 @@ const SYSTEM = [
   "Treat 'one whole X' as the entire item. Account for cooking oils, cheese, sauces, and prep that add fat and calories.",
   "When unsure between portion sizes, choose the larger realistic one. If no amount is given, estimate one typical serving.",
   "Reply with ONLY a JSON object, no prose, with numeric keys carbs, protein, fat, fiber (grams), sodium (milligrams), iron (milligrams), calories (kcal) and servingGrams (the gram weight of the whole serving you estimated).",
+  "Also include units: an object of up to 4 other common units for this food mapped to the gram weight of ONE of that unit (for example {\"egg\": 50} or {\"cup\": 245, \"slice\": 28}); use {} when none fit.",
   "If truly unrecognizable, use 0 for all.",
 ].join(" ");
 
@@ -88,6 +94,21 @@ function inRange(v: unknown, min: number, max: number, places: number): number |
   return Number.isFinite(n) && n >= min && n <= max ? round(n, places) : null;
 }
 
+/** Suggested units: an object of label -> grams; bad labels, weights and repeats are dropped. */
+function parseUnits(v: unknown): FoodUnit[] {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return [];
+  const out: FoodUnit[] = [];
+  for (const [raw, g] of Object.entries(v as Record<string, unknown>)) {
+    const label = raw.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+    const grams = inRange(g, 0.1, ESTIMATE_LIMITS.servingGrams, 1);
+    if (!label || label.length > ESTIMATE_LIMITS.unitLength || label === SERVING || label === GRAMS || grams === null) continue;
+    if (out.some((u) => u.label === label)) continue;
+    out.push({ label, grams });
+    if (out.length >= ESTIMATE_LIMITS.units) break;
+  }
+  return out;
+}
+
 /**
  * Read the model's reply leniently: the first {...} in it (code fences and stray prose are fine),
  * then each nutrient as a number. Returns undefined when there's no JSON object at all.
@@ -107,7 +128,7 @@ export function parseEstimateReply(reply: string, opts: EstimateOptions = {}): O
   const servingGrams = inRange(src.servingGrams, 0.1, ESTIMATE_LIMITS.servingGrams, 1);
   const { min, max } = ESTIMATE_LIMITS.yieldRatio;
   const yieldRatio = opts.ingredient ? inRange(src.yieldRatio, min, max, 2) : null;
-  return { nutrition, servingGrams, yieldRatio };
+  return { nutrition, servingGrams, yieldRatio, units: parseUnits(src.units) };
 }
 
 const unavailable = () => new UserError("Unavailable", "Couldn't estimate that right now. Try again, or type the nutrition by hand.");

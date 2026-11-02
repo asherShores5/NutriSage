@@ -31,7 +31,12 @@ function validateEntry(e: unknown): Entry {
   const name = typeof src.name === "string" ? src.name.trim() : "";
   if (!name || name.length > DAY_LIMITS.nameLength) throw invalid(`Entry name must be 1-${DAY_LIMITS.nameLength} characters`);
   const grams = optionalIn(src.grams, DAY_LIMITS.grams, "grams");
-  return { id: src.id, meal: src.meal as Entry["meal"], name, nutrition: validateNutrition(src.nutrition), ...(grams === null ? {} : { grams }), ...validateAmount(src) };
+  const ref = src.libraryId;
+  if (ref !== null && ref !== undefined && (typeof ref !== "string" || !ID_RE.test(ref))) throw invalid("bad Library reference");
+  return {
+    id: src.id, meal: src.meal as Entry["meal"], name, nutrition: validateNutrition(src.nutrition),
+    ...(grams === null ? {} : { grams }), ...validateAmount(src), ...(typeof ref === "string" ? { libraryId: ref } : {}),
+  };
 }
 
 /** Amount and unit come together, or neither (a migrated Entry, which counts as 1 serving). */

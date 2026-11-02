@@ -13,7 +13,7 @@ export const MEAL_LABELS: Record<Meal, string> = {
  * An amount of one Food or Recipe logged into a Meal. `nutrition` is a snapshot taken at log time:
  * later Library edits never change it. Ticket 01 logs by hand (name + nutrition); ticket 02 adds
  * grams from a Bedrock estimate; ticket 05 adds amount and unit (see scaling.ts); the Library
- * reference arrives with a later ticket. Migrated Entries have no amount or unit: they count as
+ * reference (libraryId, ticket 12) points at what it was logged from. Migrated Entries have no amount or unit: they count as
  * 1 serving of their snapshot.
  */
 export interface Entry {
@@ -27,6 +27,8 @@ export interface Entry {
   amount?: number | null;
   /** "serving", "g" or a Food's own unit label. Absent means "serving". */
   unit?: string | null;
+  /** The Library item (Food or Recipe) it was logged from, if any. Only a pointer: the snapshot above is what counts. */
+  libraryId?: string | null;
 }
 
 /** One Member's Day. The whole Day is written at once (last write wins per Day). */
