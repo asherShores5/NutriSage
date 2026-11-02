@@ -53,6 +53,8 @@ export interface Report {
   differing: string[];
   /** Old Library items folded into a Food that was already in the new Library, by name. */
   reused: string[];
+  /** Entries with a nutrient past the API's limit, written exactly as they are (see `outliersOf`). */
+  outliers: string[];
 }
 
 type OldLibItem = { name?: unknown; macros?: unknown };
@@ -61,10 +63,29 @@ type Raw = Record<string, AttributeValue> | Record<string, unknown>;
 const isMember = (u: string): u is (typeof MIGRATED_MEMBERS)[number] => (MIGRATED_MEMBERS as readonly string[]).includes(u);
 const shortHash = (...parts: string[]) => createHash("sha256").update(parts.join("\u0000")).digest("hex").slice(0, 24);
 
-/** Old macros as a complete Nutrition: missing or junk values are 0 (older rows lack fiber, sodium, iron). */
+/**
+ * Old macros as a complete Nutrition, exactly as logged: missing or junk values are 0 (older rows
+ * lack fiber, sodium, iron). Nothing is capped; a value past the API's limit is kept and reported
+ * (see `outliersOf`).
+ */
 function nutritionOf(macros: unknown): Nutrition {
   const src = (macros && typeof macros === "object" ? macros : {}) as Record<string, unknown>;
-  return Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, Math.min(DAY_LIMITS.nutrient, Math.max(0, num(src[k])))])) as Nutrition;
+  return Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, Math.max(0, num(src[k]))])) as Nutrition;
+}
+
+/** "<user> <date> <name>: <nutrient> <value>, ..." for each Entry with a nutrient past the API's limit. */
+function outliersOf(user: string, day: Day): string[] {
+  return day.entries.flatMap((e) => {
+    const over = NUTRIENT_KEYS.filter((k) => e.nutrition[k] > DAY_LIMITS.nutrient);
+    return over.length ? [`${user} ${day.date} ${e.name}: ${over.map((k) => `${k} ${e.nutrition[k]}`).join(", ")}`] : [];
+  });
+}
+
+/** The Day with nutrients capped at the API's limit, only to run the API's other checks on it. */
+function withinNutrientLimit(item: Record<string, unknown>): Record<string, unknown> {
+  const cap = (n: Nutrition) => Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, Math.min(DAY_LIMITS.nutrient, n[k])])) as Nutrition;
+  const entries = (item.entries as Entry[]).map((e) => ({ ...e, nutrition: cap(e.nutrition) }));
+  return { ...item, entries };
 }
 
 function cleanName(v: unknown, fallback = "Unnamed"): string {
@@ -125,6 +146,7 @@ export interface Plan {
   skipped: Record<string, number>;
   /** Old Library items folded into an existing new-Library Food. */
   reused: string[];
+  outliers: string[];
 }
 
 /**
@@ -199,18 +221,24 @@ export function planMigration(rows: readonly Raw[], existingFoods: readonly Food
   for (const lib of household) foodFor(lib, MIGRATED_MEMBERS[0]);
 
   let entries = 0;
+  const outliers: string[] = [];
   for (const { user, day } of days) {
     entries += day.entries.length;
+    outliers.push(...outliersOf(user, day));
     items.push({ kind: "Day", item: { PK: memberPk(user), SK: dayKey(day.date), ...day } });
   }
-  return { items, entries, skipped, reused };
+  return { items, entries, skipped, reused, outliers };
 }
 
-/** Every planned Day and goals record must pass the API's own checks before anything is written. */
+/**
+ * Every planned Day and goals record must pass the API's own checks before anything is written,
+ * except the nutrient ceiling: old nutrition is kept exactly (spec: snapshots), so a value past it
+ * is written outside resolver validation and listed in the report instead.
+ */
 function checkValid(items: readonly PlannedItem[]) {
   for (const { kind, item } of items) {
     try {
-      if (kind === "Day") validateDayInput(item);
+      if (kind === "Day") validateDayInput(withinNutrientLimit(item));
       if (kind === "Goals") validateGoals(item);
     } catch (e) {
       throw new Error(`${item.PK}/${item.SK} would be refused by the API: ${(e as Error).message}`);
@@ -270,7 +298,7 @@ export async function migrate(rows: readonly Raw[], target: Target, opts: { appl
       await db.send(new PutCommand({ TableName: table, Item: item, ConditionExpression: "attribute_not_exists(PK)" }));
     }
   }
-  return { apply: opts.apply, counts, entries: plan.entries, skipped: plan.skipped, differing, reused: plan.reused };
+  return { apply: opts.apply, counts, entries: plan.entries, skipped: plan.skipped, differing, reused: plan.reused, outliers: plan.outliers };
 }
 
 /** The report as printed by the script: the same table for a dry run and a real run. */
@@ -283,6 +311,7 @@ export function formatReport(r: Report): string {
     `Entries in migrated Days: ${r.entries}`,
     `Skipped old rows: ${Object.entries(r.skipped).map(([pk, n]) => `${pk} ${n}`).join(", ") || "none"}`,
   ];
+  if (r.outliers.length) lines.push(`Over the API's limits (written as they are): ${r.outliers.join("; ")}`);
   if (r.reused.length) lines.push(`Old Library items matched to Foods already in the Library: ${r.reused.join(", ")}`);
   if (r.differing.length) lines.push(`Already in the table but different (left as they are):`, ...r.differing.map((d) => `  ${d}`));
   return lines.join("\n");

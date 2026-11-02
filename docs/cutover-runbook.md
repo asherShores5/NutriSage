@@ -66,14 +66,21 @@ Numbers creep up if the old app was used since. What to check:
   was saved in the new app already (e.g. while testing). The old Favorite points at that Food,
   so Food `create` drops by one for each. That's expected.
 - The script refuses to run (and writes nothing) if any planned Day or goals would fail the API's
-  own validation.
+  own validation, with one exception: nutrition is kept exactly as logged, never capped. An Entry
+  with a nutrient past the API's ceiling (100,000) is written as it is and listed on a line
+  `Over the API's limits (written as they are): ...`. The old table had none on 2026-11-02 (largest:
+  1,850 calories, 3,800 mg sodium). If one shows up, it's almost surely a typo: after the
+  migration, delete or re-log that Entry in the app, because the API refuses to save a Day that
+  still holds it.
 
 What the mapping does (spec: Migration and cutover):
 
 - Days keep each Entry's exact nutrition snapshot and Meal; a missing Meal becomes Snack. Old rows
   missing fiber, sodium or iron get 0. A `(×N)` suffix on a name becomes an amount of N servings
   (the snapshot is already for N) and leaves the name; a suffix that isn't a valid amount stays in
-  the name. Migrated Entries have no Library reference.
+  the name. (Accepted deviation from the spec, which says Entries move unchanged: the old app
+  baked the portion into the name, so reading it into an amount keeps the same totals and lets the
+  editor rescale it.) Migrated Entries have no Library reference.
 - Weight 0 or missing means not logged (null). Water null becomes 0 cups.
 - Goals carry over; the old `waterGoal` becomes the water goal (8 cups when there was none).
 - Old Favorites and the household quick-add meals become Foods, one per name (ignoring case),
