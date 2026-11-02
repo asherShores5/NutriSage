@@ -73,6 +73,11 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   A Day write always carries the whole Day (Entries, water, weight): last write wins per Day.
 - **Two allowlists**: Cognito has no self sign-up, and the Lambda also refuses any username not in
   `ALLOWED_USERNAMES` (`USERNAMES` in `infra/lib/stacks.ts`), even with a valid token.
+- **Passkeys** (Cognito native, USER_AUTH): the relying party is `APP_DOMAIN`, so a passkey only
+  works on that exact host (not localhost or a CloudFront URL) and an RP change orphans every
+  passkey. The password stays as the backup first factor; passkey-only sign-in is out of scope.
+  e2e covers the WebAuthn path with a Chromium virtual authenticator (`e2e/passkeys.ts`); real
+  Face ID, iCloud Keychain and phone-QR sign-in get checked on device after deploy.
 - **The handler reads env at import time**: tests and e2e import it through
   `api/src/testing/harness.ts` / `e2e/backend.ts`, which set the env first. Never import it statically in a test.
 - **fakeDynamo throws on anything it doesn't support**; extend its parsers when a resolver needs more.
@@ -92,5 +97,5 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   replaces the whole variable map, so re-send every variable together.
 - **GitHub Pages** (`.github/workflows/static.yml`) still uploads the whole repo on push to `main`
   for the old app; the Pages URL path depends on the repo name, so the rename waits for cutover.
-- Not testable in e2e: real passkeys (WebAuthn), iOS install quirks, offline launch (service
+- Not testable in e2e: real device passkeys (Face ID, Keychain, phone QR), iOS install quirks, offline launch (service
   workers are blocked so routes see every request). Verify those on device after deploy.

@@ -64,8 +64,28 @@ const tokensFor = (username: string) => ({
   },
 });
 
+/** The fake relying party: the test origin's host (the real pool uses the app domain). */
+export const RP_ID = "nutrisage.test";
+
+/** Passkey credential IDs per Member, as Cognito would hold them. */
+const passkeys = new Map<string, string[]>();
+const sessions = new Map<string, string>();
+const b64url = (s: string) => Buffer.from(s).toString("base64url");
+const challenge = () => b64url(crypto.randomUUID());
+const memberForAccess = (token: unknown) => {
+  const u = String(token ?? "").replace(/^fake-access\./, "");
+  return MEMBERS[u] ? u : undefined;
+};
+
+/** Start a check with these passkeys on the account (or none). */
+export function setPasskeys(username: string, ids: string[]) {
+  passkeys.set(username, [...ids]);
+}
+export const passkeysOf = (username: string) => passkeys.get(username) ?? [];
+
 export function cognito(target: string, body: any): { status: number; json: unknown } {
   const fail = (type: string, message: string) => ({ status: 400, json: { __type: type, message } });
+  const wrong = () => fail("NotAuthorizedException", "Incorrect username or password.");
   switch (target) {
     case "InitiateAuth": {
       if (body.AuthFlow === "REFRESH_TOKEN_AUTH") {
@@ -73,9 +93,53 @@ export function cognito(target: string, body: any): { status: number; json: unkn
         return MEMBERS[u] ? { status: 200, json: { AuthenticationResult: { ...tokensFor(u).AuthenticationResult, RefreshToken: undefined } } } : fail("NotAuthorizedException", "Invalid Refresh Token");
       }
       const u = body.AuthParameters?.USERNAME;
+      if (body.AuthParameters?.PREFERRED_CHALLENGE === "WEB_AUTHN") {
+        const ids = MEMBERS[u] ? passkeysOf(u) : [];
+        // Like Cognito: no passkey means the other available challenges instead.
+        if (!ids.length) return { status: 200, json: { ChallengeName: "SELECT_CHALLENGE", Session: "s-none", AvailableChallenges: ["PASSWORD"] } };
+        const session = `s-${crypto.randomUUID()}`;
+        sessions.set(session, u);
+        const options = { challenge: challenge(), rpId: RP_ID, timeout: 60_000, userVerification: "required", allowCredentials: ids.map((id) => ({ id, type: "public-key" })) };
+        return { status: 200, json: { ChallengeName: "WEB_AUTHN", Session: session, ChallengeParameters: { CREDENTIAL_REQUEST_OPTIONS: JSON.stringify(options) } } };
+      }
       // preventUserExistenceErrors: an unknown user looks like a wrong password.
-      if (!MEMBERS[u] || body.AuthParameters?.PASSWORD !== PASSWORD) return fail("NotAuthorizedException", "Incorrect username or password.");
+      if (!MEMBERS[u] || body.AuthParameters?.PASSWORD !== PASSWORD) return wrong();
       return { status: 200, json: tokensFor(u) };
+    }
+    case "RespondToAuthChallenge": {
+      if (body.ChallengeName !== "WEB_AUTHN") return fail("NotImplemented", `fake Cognito has no ${body.ChallengeName} challenge`);
+      const u = sessions.get(body.Session);
+      sessions.delete(body.Session);
+      const id = JSON.parse(body.ChallengeResponses?.CREDENTIAL ?? "{}").id;
+      if (!u || u !== body.ChallengeResponses?.USERNAME || !passkeysOf(u).includes(id)) return fail("NotAuthorizedException", "Passkey not recognized.");
+      return { status: 200, json: tokensFor(u) };
+    }
+    case "StartWebAuthnRegistration": {
+      const u = memberForAccess(body.AccessToken);
+      if (!u) return fail("NotAuthorizedException", "Invalid Access Token");
+      return {
+        status: 200,
+        json: {
+          CredentialCreationOptions: {
+            challenge: challenge(), rp: { id: RP_ID, name: "NutriSage" },
+            user: { id: b64url(u), name: u, displayName: u },
+            pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+            authenticatorSelection: { residentKey: "required", userVerification: "required" },
+            excludeCredentials: passkeysOf(u).map((id) => ({ id, type: "public-key" })),
+          },
+        },
+      };
+    }
+    case "CompleteWebAuthnRegistration": {
+      const u = memberForAccess(body.AccessToken);
+      if (!u) return fail("NotAuthorizedException", "Invalid Access Token");
+      setPasskeys(u, [...passkeysOf(u), body.Credential.id]);
+      return { status: 200, json: {} };
+    }
+    case "ListWebAuthnCredentials": {
+      const u = memberForAccess(body.AccessToken);
+      if (!u) return fail("NotAuthorizedException", "Invalid Access Token");
+      return { status: 200, json: { Credentials: passkeysOf(u).map((id, i) => ({ CredentialId: id, RelyingPartyId: RP_ID, CreatedAt: 1_800_000_000 + i })) } };
     }
     case "RevokeToken":
       return { status: 200, json: {} };

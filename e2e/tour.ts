@@ -27,7 +27,7 @@ await sweep(await app.open("asher"), "phone");
 await sweep(await app.open("asher", { device: "desktop" }), "desktop");
 await sweep(await app.open("asher", { dark: true }), "dark");
 const out = await app.open("asher", { signedOut: true });
-await out.getByRole("button", { name: "Sign in" }).waitFor();
+await out.getByRole("button", { name: "Sign in with passkey" }).waitFor();
 await shot(out, "tour-phone-00-login");
 await app.close();
 console.log(`screenshots in ${OUT}/tour-*.png`);

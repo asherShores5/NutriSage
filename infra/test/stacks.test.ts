@@ -38,6 +38,19 @@ describe("auth", () => {
     });
   });
 
+  it("a Member can sign in with a passkey for the app domain, with Face ID or another user check required", () => {
+    const [pool] = Object.values(app.findResources("AWS::Cognito::UserPool"));
+    expect([...pool.Properties.Policies.SignInPolicy.AllowedFirstAuthFactors].sort()).toEqual(["PASSWORD", "WEB_AUTHN"]);
+    expect(pool.Properties.WebAuthnRelyingPartyID).toBe("nutrisage.ashershores.com");
+    expect(pool.Properties.WebAuthnUserVerification).toBe("required");
+  });
+
+  it("the web client signs in through USER_AUTH (password or passkey) and refresh only", () => {
+    const [client] = Object.values(app.findResources("AWS::Cognito::UserPoolClient"));
+    expect([...client.Properties.ExplicitAuthFlows].sort()).toEqual(["ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_USER_AUTH"]);
+    expect(client.Properties.PreventUserExistenceErrors).toBe("ENABLED");
+  });
+
   it("tokens last an hour and the session (refresh token) a week", () => {
     app.hasResourceProperties("AWS::Cognito::UserPoolClient", {
       GenerateSecret: false,
