@@ -1,8 +1,8 @@
 // A Guest's data, in this browser's storage only (spec: Guest access). Nothing here talks to a
 // server. Shape: { days: { [date]: Day }, library: Food[], goals: Goals }.
 import {
-  GUEST_CREATOR, NUTRIENT_KEYS, defaultGoals, findFoodByName, foodFromServing, guestSeed,
-  type Day, type Food, type Goals, type ServingInput,
+  GUEST_CREATOR, NUTRIENT_KEYS, defaultGoals, editedFood, findFoodByName, foodFromServing, foodNameKey, guestSeed,
+  type Day, type Food, type FoodEdit, type Goals, type ServingInput,
 } from "@nutrisage/shared";
 
 const KEY = "nutrisage.guest.data";
@@ -76,6 +76,29 @@ export function addGuestFood(est: ServingInput): Food | null {
   data.library.push(food);
   write(data);
   return food;
+}
+
+/** Edit a Food in the Guest's device Library, like the Member `putFood` (same checks, same words). */
+export function putGuestFood(id: string, edit: FoodEdit): Food {
+  const r = editedFood(edit);
+  if (!r.ok) throw new Error(r.error);
+  const data = read();
+  const existing = data.library.find((f) => f.id === id);
+  if (!existing) throw new Error("That Food is no longer in the Library");
+  const clash = data.library.find((f) => f.id !== id && foodNameKey(f.name) === foodNameKey(r.food.name));
+  if (clash) throw new Error(`The Library already has ${clash.name}`);
+  const food: Food = { id, ...r.food, createdBy: existing.createdBy, updatedAt: Date.now() };
+  data.library = data.library.map((f) => (f.id === id ? food : f));
+  write(data);
+  return food;
+}
+
+/** Delete a Food from the Guest's device Library, like the Member `deleteFood`. Days are untouched. */
+export function deleteGuestFood(id: string): string {
+  const data = read();
+  data.library = data.library.filter((f) => f.id !== id);
+  write(data);
+  return id;
 }
 
 /** The Guest's goals, like the Member `goals` query. */

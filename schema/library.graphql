@@ -31,3 +31,27 @@ extend type Query {
   "The shared Library: the same for every Member."
   library: Library!
 }
+
+input FoodUnitInput {
+  label: String!
+  grams: Float!
+}
+
+"A Food's editable parts, as the Library edit form holds them (shared/src/foodEdit.ts). Nutrition is per serving; it is stored per gram."
+input FoodEditInput {
+  name: String!
+  "Nutrition in one serving."
+  nutrition: NutritionInput!
+  "Grams in one serving, or null when unknown (then the Food has no g or other units)."
+  servingGrams: Float
+  "Units other than serving and g."
+  units: [FoodUnitInput!]!
+  yieldRatio: Float
+}
+
+extend type Mutation {
+  "Edit a Library Food (either Member may). Entries logged from it keep their own snapshot."
+  putFood(id: ID!, input: FoodEditInput!): Food!
+  "Delete a Library Food and every Member's Favorite of it. Entries logged from it are untouched. Returns the id."
+  deleteFood(id: ID!): ID!
+}
