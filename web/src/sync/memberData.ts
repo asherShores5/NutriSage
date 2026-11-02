@@ -1,4 +1,4 @@
-// The Member's data on this device: a local copy of the Days and goals the screens have opened,
+// The Member's data on this device: a local copy of the Days, goals and Favorites the screens have opened,
 // saved in localStorage, plus the outbox that writes them through to the API (HoneyDo-style:
 // local copy first, server is the sync layer). Screens read and write through useDay/useGoals;
 // nothing here renders.
@@ -12,9 +12,10 @@
 // - Only a signed-in Member's copy is saved; it's dropped when a different Member (or nobody)
 //   signs in on this device. A Guest's data already lives on the device (guest/store.ts, behind
 //   the same api/ calls), so for a Guest this is an in-memory copy only.
-import { daysByDate, type Day, type Goals } from "@nutrisage/shared";
+import { bumpFavorites, daysByDate, toggleFavorite as toggled, type Day, type Favorite, type Goals } from "@nutrisage/shared";
 import { getDays, putDay } from "../api/days";
 import { NetworkError } from "../api/errors";
+import { deleteFavorite, getFavorites, putFavorite } from "../api/favorites";
 import { getGoals, putGoals } from "../api/goals";
 import { currentUsername, onAuthChange } from "../auth";
 import { isGuest, onSessionChange } from "../session";
@@ -32,10 +33,14 @@ interface Cache {
   user?: string;
   days: Record<string, Day>;
   goals?: Goals;
+  favorites?: Favorite[];
 }
 
 const dayRow = (date: string) => `DAY#${date}`;
 const GOALS_ROW = "GOALS";
+/** Errors and edit counts for the Favorites as a whole (each Favorite is its own outbox row, FAV#<libraryId>). */
+const FAVS_ROW = "FAVORITES";
+const isFavOp = (op: Op) => op.type === "putFavorite" || op.type === "deleteFavorite";
 const emptyDay = (date: string): Day => ({ date, entries: [], water: null, weight: null });
 
 /** Who the data belongs to right now. Only a Member's copy is written to localStorage. */
@@ -51,6 +56,7 @@ const edits = new Map<string, number>();
 /** Dates open on some screen (ref-counted), reloaded on resume. */
 const watched = new Map<string, number>();
 let goalsWatched = false;
+let favoritesWatched = false;
 let started = false;
 let retry: ReturnType<typeof setTimeout> | undefined;
 
@@ -68,7 +74,7 @@ function readJSON<T>(key: string): T | undefined {
 
 function readCache(u: string | undefined): Cache {
   const c = persisted(u) ? readJSON<Cache>(CACHE) : undefined;
-  return c && c.user === u ? { user: u, days: c.days ?? {}, goals: c.goals } : { user: u, days: {} };
+  return c && c.user === u ? { user: u, days: c.days ?? {}, goals: c.goals, favorites: c.favorites } : { user: u, days: {} };
 }
 
 function readOps(u: string | undefined): Op[] {
@@ -97,19 +103,32 @@ function newOutbox(u: string | undefined) {
     save: (ops) => {
       if (persisted(u)) localStorage.setItem(OUTBOX, JSON.stringify({ user: u, ops }));
     },
-    send: (op) => (op.type === "putDay" ? putDay(op.day) : putGoals(op.goals)),
+    send: (op) => {
+      switch (op.type) {
+        case "putDay": return putDay(op.day);
+        case "putGoals": return putGoals(op.goals);
+        case "putFavorite": return putFavorite(op.favorite);
+        case "deleteFavorite": return deleteFavorite(op.libraryId);
+      }
+    },
     onSent: (op, result, stillPending) => {
       if (stillPending) return;
       if (op.type === "putDay") cache.days = { ...cache.days, [op.day.date]: result as Day };
-      else cache.goals = result as Goals;
+      else if (op.type === "putGoals") cache.goals = result as Goals;
+      else if (op.type === "putFavorite") {
+        // The server keeps the newer last-used time (another device may have logged it later).
+        const fav = result as Favorite;
+        cache.favorites = cache.favorites?.map((f) => (f.libraryId === fav.libraryId ? fav : f));
+      } else return;
       writeCache();
       emit();
     },
     onRejected: (op, e) => {
-      errors = { ...errors, [opRow(op)]: `Couldn't save: ${e.message}` };
+      errors = { ...errors, [isFavOp(op) ? FAVS_ROW : opRow(op)]: `Couldn't save: ${e.message}` };
       // Show what the server actually holds instead of the refused change.
       if (op.type === "putDay") void loadDay(op.day.date, true);
-      else void loadGoals(true);
+      else if (op.type === "putGoals") void loadGoals(true);
+      else void loadFavorites(true);
       emit();
     },
     onReachable: (reachable) => {
@@ -182,6 +201,29 @@ async function loadGoals(keepError = false) {
   emit();
 }
 
+/**
+ * The server's Favorites with this device's queued Favorite writes laid over them. If a Favorite
+ * changed here while loading, the local copy stays (the outbox will send it).
+ */
+async function loadFavorites(keepError = false) {
+  const at = edits.get(FAVS_ROW) ?? 0;
+  try {
+    let list = await getFavorites();
+    if ((edits.get(FAVS_ROW) ?? 0) !== at) return;
+    for (const op of outbox.pending()) {
+      if (op.type === "putFavorite") list = [...list.filter((f) => f.libraryId !== op.favorite.libraryId), op.favorite];
+      else if (op.type === "deleteFavorite") list = list.filter((f) => f.libraryId !== op.libraryId);
+    }
+    cache.favorites = list;
+    writeCache();
+    if (!keepError) errors = { ...errors, [FAVS_ROW]: undefined };
+  } catch (e) {
+    if (e instanceof NetworkError) cache.favorites ??= [];
+    else errors = { ...errors, [FAVS_ROW]: (e as Error).message };
+  }
+  emit();
+}
+
 let resuming: Promise<void> | undefined;
 
 /** Send the outbox, then reload every open Day and the goals. One at a time. */
@@ -189,7 +231,11 @@ export function resume(): Promise<void> {
   resuming ??= (async () => {
     if (!user) return;
     await outbox.flush();
-    await Promise.all([...[...watched.keys()].map((d) => loadDay(d)), goalsWatched ? loadGoals() : undefined]);
+    await Promise.all([
+      ...[...watched.keys()].map((d) => loadDay(d)),
+      goalsWatched ? loadGoals() : undefined,
+      favoritesWatched ? loadFavorites() : undefined,
+    ]);
   })().finally(() => (resuming = undefined));
   return resuming;
 }
@@ -289,4 +335,54 @@ export async function saveGoals(goals: Goals): Promise<void> {
   await outbox.enqueue({ type: "putGoals", goals });
   const refused = errors[GOALS_ROW];
   if (refused) throw new Error(refused);
+}
+
+// ---- Favorites ---------------------------------------------------------------
+
+/** The Member's Favorites (undefined until first loaded). Quick Add order is `quickAdd` in shared. */
+export const currentFavorites = () => cache.favorites;
+export const favoritesError = () => errors[FAVS_ROW];
+
+/** A screen shows Favorites (star buttons, Quick Add): load them once, and again on resume. */
+export function watchFavorites() {
+  if (favoritesWatched) return;
+  favoritesWatched = true;
+  void loadFavorites();
+}
+
+function saveFavorites(next: Favorite[]) {
+  bump(FAVS_ROW);
+  cache.favorites = next;
+  errors = { ...errors, [FAVS_ROW]: undefined };
+  writeCache();
+  emit();
+}
+
+/** Star or unstar a Library item, on the device now and queued for the API. */
+export function toggleFavorite(libraryId: string) {
+  const { favorites, change } = toggled(cache.favorites ?? [], libraryId, Date.now());
+  saveFavorites(favorites);
+  void outbox.enqueue(change.type === "put" ? { type: "putFavorite", favorite: change.favorite } : { type: "deleteFavorite", libraryId });
+}
+
+/**
+ * Entries were just logged from these Library items (from Quick Add, search or anywhere else):
+ * every starred one moves to the top of Quick Add. Unstarred items change nothing.
+ */
+export function noteLogged(libraryIds: readonly (string | null | undefined)[]) {
+  const { favorites, bumped } = bumpFavorites(cache.favorites ?? [], libraryIds, Date.now());
+  if (!bumped.length) return;
+  saveFavorites(favorites);
+  for (const favorite of bumped) void outbox.enqueue({ type: "putFavorite", favorite });
+}
+
+/**
+ * Drop a Library item from this device's Favorites without a write (Library delete, ticket 15:
+ * the server already removes everyone's Favorites of a deleted item).
+ */
+export function forgetFavorite(libraryId: string) {
+  if (!cache.favorites?.some((f) => f.libraryId === libraryId)) return;
+  cache.favorites = cache.favorites.filter((f) => f.libraryId !== libraryId);
+  writeCache();
+  emit();
 }

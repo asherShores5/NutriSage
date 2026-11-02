@@ -2,7 +2,7 @@
 // Screenshots in $OUT/tour-* (see lib.ts). Look at them; DOM checks miss layout bugs.
 import type { Page } from "playwright";
 import { launch, todayKey } from "./app";
-import { graphql, seed, seedLibrary } from "./backend";
+import { db, graphql, seed, seedLibrary } from "./backend";
 import { lastDays } from "../shared/src/week";
 import { OUT, shot, tab } from "./lib";
 
@@ -15,6 +15,12 @@ for (const [i, date] of lastDays(todayKey(), 21).slice(0, -1).entries()) {
   await graphql("fake-id.asher", "mutation($input: DayInput!) { putDay(input: $input) { date } }", {
     input: { date, entries: [{ id: `h${i}`, meal: "dinner", name: "Past dinner", nutrition: { carbs: calories / 10, protein: 90, fat: 60, fiber: 25, sodium: 1800, iron: 9, calories } }], water: 6, weight: i % 3 ? null : 174 - i * 0.15 },
   });
+}
+// Two starred Library Foods, so Today shows a filled Quick Add row.
+for (const [i, name] of ["Greek yogurt", "Rolled oats with a long name for wrapping"].entries()) {
+  const id = `tour-food-${i}`;
+  db.seed({ PK: "HOUSEHOLD", SK: `FOOD#${id}`, id, name, createdBy: "asher", updatedAt: 1, nutrition: { carbs: 0.2, protein: 0.1, fat: 0.05, fiber: 0, sodium: 1, iron: 0, calories: 0.8 }, units: [{ label: "serving", grams: 150 }, { label: "g", grams: 1 }] });
+  await graphql("fake-id.asher", "mutation($input: FavoriteInput!) { putFavorite(input: $input) { libraryId } }", { input: { libraryId: id, lastUsed: Date.now() - i * 1000 } });
 }
 const app = await launch();
 
@@ -57,7 +63,7 @@ async function sweep(p: Page, name: string) {
   await p.getByRole("button", { name: "Type nutrition by hand" }).click();
   await shot(p, `tour-${name}-01b-today-by-hand`);
   // An Entry's editor open.
-  await p.getByRole("region", { name: "Entries" }).getByRole("button", { name: /Turkey sandwich/ }).click();
+  await p.getByRole("region", { name: "Entries" }).getByRole("button", { name: /^Turkey sandwich/ }).click();
   await shot(p, `tour-${name}-01c-today-entry-editor`);
   // Yesterday (Day navigation), away from today.
   await p.getByRole("group", { name: "Day" }).getByRole("button", { name: "Previous Day" }).click();

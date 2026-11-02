@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { DEFAULT_WATER_GOAL, dateKey, moveEntry, sumMacros, type Entry, type EntryMove } from "@nutrisage/shared";
 import { Bars } from "../../components/Bars";
+import { noteLogged } from "../../library/useFavorites";
 import { readDay, saveDay } from "../../sync/memberData";
 import { useGoals } from "../goals/useGoals";
 import { DayNav } from "./DayNav";
 import { EntryForm } from "./EntryForm";
 import { EntryList } from "./EntryList";
+import { QuickAdd } from "./QuickAdd";
 import { Water } from "./Water";
 import { Weight } from "./Weight";
 import { useDay } from "./useDay";
 import "./today.css";
 
-/** Today: one Day (the Member's current local date unless they step to another): progress bars, the add box, Entries by Meal, water and weight. */
+/** Today: one Day (the Member's current local date unless they step to another): progress bars, Quick Add, the add box, Entries by Meal, water and weight. */
 export function Today() {
   const today = dateKey(new Date());
   const [date, setDate] = useState(today);
@@ -21,6 +23,12 @@ export function Today() {
   const isToday = date === today;
 
   const setEntries = (change: (entries: Entry[]) => Entry[]) => update((d) => ({ ...d, entries: change(d.entries) }));
+
+  /** Every new Entry (add box, Quick Add) comes through here: a starred item moves to the top of Quick Add. */
+  function addEntry(entry: Omit<Entry, "id">) {
+    setEntries((list) => [...list, { id: crypto.randomUUID(), ...entry }]);
+    noteLogged([entry.libraryId]);
+  }
 
   /**
    * Move an Entry to another Day (and maybe Meal). The destination Day is written first, then this
@@ -56,7 +64,8 @@ export function Today() {
       ) : (
         <>
           <Bars totals={sumMacros(day.entries)} goals={goals} />
-          <EntryForm onAdd={(entry) => setEntries((list) => [...list, { id: crypto.randomUUID(), ...entry }])} />
+          <QuickAdd onAdd={addEntry} />
+          <EntryForm onAdd={addEntry} />
           <EntryList
             key={date}
             date={date}

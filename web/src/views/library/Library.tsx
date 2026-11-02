@@ -4,6 +4,7 @@ import { deleteFood, putFood } from "../../api/library";
 import { NetworkError } from "../../api/errors";
 import { isGuest } from "../../session";
 import { foodToForm, readFoodForm, type FoodFormValues } from "../../library/foodForm";
+import { forgetFavorite } from "../../library/useFavorites";
 import { forgetFood, rememberFood, useLibrary } from "../../library/useLibrary";
 import "./library.css";
 
@@ -78,7 +79,7 @@ function FoodEditor({ food, onDone }: { food: Food; onDone: () => void }) {
     } catch (e) {
       if (e instanceof NetworkError) return setError("You're offline. Library changes need a connection; try again when you're back.");
       const msg = (e as Error).message;
-      if (msg.startsWith("NotFound")) forgetFood(food.id); // the other Member deleted it meanwhile
+      if (msg.startsWith("NotFound")) { forgetFood(food.id); forgetFavorite(food.id); } // the other Member deleted it meanwhile
       setError(msg.replace(/^(ValidationError|NotFound): /, ""));
     } finally {
       setBusy(false);
@@ -94,7 +95,11 @@ function FoodEditor({ food, onDone }: { food: Food; onDone: () => void }) {
 
   function remove() {
     if (!confirm(`Delete ${food.name} from the Library? It leaves everyone's Quick Add. Entries already logged stay.`)) return;
-    void run(async () => forgetFood(await deleteFood(food.id)));
+    void run(async () => {
+      const id = await deleteFood(food.id);
+      forgetFood(id);
+      forgetFavorite(id); // the server already dropped it from every Member's Favorites
+    });
   }
 
   return (
