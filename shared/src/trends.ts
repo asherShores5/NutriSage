@@ -192,7 +192,11 @@ export function defaultYMode(metric: TrendMetric): YMode {
   return metric === "weight" ? "fit" : "zero";
 }
 
-/** Y-axis bounds for one series. The max is at least 1 so a flat-zero line still has an axis. */
+/**
+ * Y-axis bounds for one series. The max is at least 1 so a flat-zero line still has an axis. Fit
+ * mode leaves out today's in-progress point (unless nothing else has data); it's still drawn,
+ * clipped at the plot edge if it falls outside.
+ */
 export function trendBounds(points: readonly TrendPoint[], mode: YMode, opts: BoundsOptions = {}): YBounds {
   const auto = autoBounds(points, mode === "fit", opts.goal ?? null);
   if (mode !== "manual" || !opts.manual) return auto;
@@ -204,7 +208,9 @@ export function trendBounds(points: readonly TrendPoint[], mode: YMode, opts: Bo
 const manualBoundsValid = (b: YBounds) => Number.isFinite(b.min) && Number.isFinite(b.max) && b.min < b.max;
 
 function autoBounds(points: readonly TrendPoint[], fit: boolean, goal: number | null): YBounds {
-  const vals = points.map((p) => p.value).filter((v): v is number => v !== null);
+  // Fit to the finished Days: today's half-logged point would drag the axis down (it's still drawn).
+  const done = fit ? points.filter((p) => !p.inProgress && p.value !== null) : [];
+  const vals = (done.length ? done : points).map((p) => p.value).filter((v): v is number => v !== null);
   const all = goal === null ? vals : [...vals, goal];
   if (!all.length) return { min: 0, max: 1 };
   return { min: fit && vals.length ? Math.min(...all) : 0, max: Math.max(1, ...all) };
