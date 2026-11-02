@@ -3,9 +3,10 @@
 // Schema: schema/favorites.graphql. Quick Add order (newest lastUsed first) is shared/src/favorites.ts.
 //
 // Writes come from each device's outbox, possibly late (offline), so a put never moves lastUsed
-// backwards: an older bump arriving after a newer one keeps the newer. Library delete (ticket 15)
-// calls removeFavoritesOf so a deleted item drops out of everyone's Quick Add; the client also
-// skips any Favorite whose item is gone (quickAdd in shared), so a stray orphan is harmless.
+// backwards: an older bump arriving after a newer one keeps the newer. Library delete
+// (deleteFood in library.ts) removes every Member's Favorite of the item in the same transaction;
+// the client also skips any Favorite whose item is gone (quickAdd in shared), so a stray orphan
+// (e.g. a star racing a delete) is harmless.
 import { DeleteCommand, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import type { Favorite } from "@nutrisage/shared";
 import { UserError, invalid } from "../errors";
@@ -52,17 +53,6 @@ async function countFavorites(username: string): Promise<number> {
     ExclusiveStartKey = r.LastEvaluatedKey;
   } while (ExclusiveStartKey);
   return n;
-}
-
-/**
- * Remove one Library item from every Member's Favorites. Ticket 15 calls this when a Library item
- * is deleted. Members are the allowlist (ALLOWED_USERNAMES), read at call time.
- */
-export async function removeFavoritesOf(libraryId: string): Promise<void> {
-  const members = (process.env.ALLOWED_USERNAMES ?? "").split(",").filter(Boolean);
-  await Promise.all(
-    members.map((u) => ddb().send(new DeleteCommand({ TableName: TABLE, Key: { PK: memberPk(u), SK: favoriteKey(libraryId) } }))),
-  );
 }
 
 /** Every Favorite of one Member, in no particular order. */

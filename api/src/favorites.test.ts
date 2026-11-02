@@ -83,13 +83,12 @@ describe("putting a Favorite", () => {
   });
 });
 
-describe("removeFavoritesOf (for a Library delete)", () => {
-  it("drops the item from every Member's Favorites and leaves the rest", async () => {
+describe("deleting a Library item", () => {
+  it("drops it from every Member's Favorites and leaves their other Favorites", async () => {
     await h.call(h.A, "putFavorite", fav("eggs"));
     await h.call(h.A, "putFavorite", fav("oats"));
     await h.call(h.B, "putFavorite", fav("eggs"));
-    const { removeFavoritesOf } = await import("./resolvers/favorites");
-    await removeFavoritesOf("eggs");
+    await h.call(h.B, "deleteFood", { id: "eggs" });
     expect((await favorites(h.A)).map((f: any) => f.libraryId)).toEqual(["oats"]);
     expect(await favorites(h.B)).toEqual([]);
   });

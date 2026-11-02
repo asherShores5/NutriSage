@@ -75,9 +75,8 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   shared Library. Partitions use the Cognito username (admin-created, allowlisted), not the sub.
   A Day write always carries the whole Day (Entries, water, weight): last write wins per Day.
   Favorites are one row each at `MEMBER#<username>` / `FAV#<libraryId>` with `lastUsed`; a put never
-  moves `lastUsed` backwards (late outbox writes from another device). `removeFavoritesOf(libraryId)` in
-  `api/src/resolvers/favorites.ts` clears an item from every Member (for Library delete); Quick Add
-  (`quickAdd` in shared) skips orphans anyway. Web: `library/useFavorites.ts` (`useFavorites`,
+  moves `lastUsed` backwards (late outbox writes from another device). `deleteFood` clears an item from
+  every Member's Favorites in its transaction; Quick Add (`quickAdd` in shared) skips orphans anyway. Web: `library/useFavorites.ts` (`useFavorites`,
   `useFavoriteIds` for search ranking, `noteLogged` after any add, `forgetFavorite` after a delete).
   Goals live at `MEMBER#<username>` / `GOALS` (0 = no goal; water defaults to 8 cups). Weight is > 0 or null
   (the old app's 0 meant not logged); water is whole cups.

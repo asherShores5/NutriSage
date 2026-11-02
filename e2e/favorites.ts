@@ -4,7 +4,7 @@
 import { expect } from "playwright/test";
 import { launch } from "./app";
 import { calls, db } from "./backend";
-import { checklist, shot } from "./lib";
+import { checklist, shot, tab } from "./lib";
 
 // Two Foods in the shared Library (per gram, weighed), so the add box logs them with no estimate.
 const food = (id: string, name: string, servingGrams: number, calories: number) => ({
@@ -76,6 +76,20 @@ await c.check("unstarring removes it from Quick Add", async () => {
   await entries.getByRole("button", { name: "Unstar Rolled oats" }).first().click();
   await expect.poll(order).toEqual(["Greek yogurt"]);
   await expect.poll(() => db.dump().some((r) => r.SK === "FAV#food-oats")).toBe(false);
+});
+
+await c.check("deleting a starred Food in the Library drops it from Quick Add at once; its Entries stay", async () => {
+  await tab(p, "Profile");
+  await p.getByRole("button", { name: "Open Library" }).click();
+  await p.getByRole("list", { name: "Foods" }).getByRole("button", { name: /Greek yogurt/ }).click();
+  p.once("dialog", (d) => void d.accept());
+  await p.getByRole("form", { name: "Edit Greek yogurt" }).getByRole("button", { name: "Delete" }).click();
+  await expect(p.getByRole("list", { name: "Foods" }).getByRole("button", { name: /Greek yogurt/ })).toHaveCount(0);
+  await tab(p, "Today");
+  await expect(quick.getByText(/Star an Entry/)).toBeVisible();
+  await expect(entries.getByText("Greek yogurt").first()).toBeVisible();
+  await expect(entries.getByRole("button", { name: /star Greek yogurt/i })).toHaveCount(0);
+  if (db.dump().some((r) => r.SK === "FAV#food-yogurt")) throw new Error("the Favorite was left on the server");
 });
 
 await c.check("Favorites are per Member: aubyn's Quick Add is empty", async () => {

@@ -2,12 +2,14 @@
 // Member reads and writes the same rows. Schema: schema/library.graphql.
 //
 // Ticket 12: the `library` query, and addEstimatedFood, which the Member estimate resolver calls so
-// every estimated Food lands here (names deduplicated case-insensitively). Library edit (15) adds
-// putFood/deleteFood here; Recipes (19) add a RECIPE# prefix and a `recipes` field on Library.
-import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { NUTRIENT_KEYS, findFoodByName, foodFromServing, type Food } from "@nutrisage/shared";
+// every estimated Food lands here (names deduplicated case-insensitively). Ticket 15: putFood (edit,
+// either Member) and deleteFood (also removes every Member's Favorite of it). Recipes (19) add a
+// RECIPE# prefix and a `recipes` field on Library.
+import { PutCommand, QueryCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { NUTRIENT_KEYS, editedFood, findFoodByName, foodFromServing, foodNameKey, type Food, type FoodEdit } from "@nutrisage/shared";
+import { UserError, invalid } from "../errors";
 import type { Estimate } from "../estimate";
-import { HOUSEHOLD_PK, TABLE, ddb, foodKey, strip } from "../table";
+import { HOUSEHOLD_PK, TABLE, ddb, favoriteKey, foodKey, memberPk, strip } from "../table";
 import type { ResolverModule } from "./types";
 
 /** Record cap against a scripted flood; far above what a household logs. Mutable for tests only. */
@@ -56,6 +58,66 @@ export async function addEstimatedFood(username: string, est: Estimate): Promise
   return food;
 }
 
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+function foodId(v: unknown): string {
+  if (typeof v !== "string" || !ID_RE.test(v)) throw invalid("bad Food id");
+  return v;
+}
+
+/** The GraphQL FoodEditInput as a FoodEdit; editedFood does the real checks. */
+function asEdit(input: unknown): FoodEdit {
+  const src = (input ?? {}) as Record<string, any>;
+  if (!src.nutrition || typeof src.nutrition !== "object") throw invalid("nutrition is required");
+  if (!Array.isArray(src.units)) throw invalid("units is required");
+  return {
+    name: typeof src.name === "string" ? src.name : "",
+    nutrition: Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, src.nutrition[k]])) as FoodEdit["nutrition"],
+    servingGrams: src.servingGrams ?? null,
+    units: src.units.map((u: any) => ({ label: typeof u?.label === "string" ? u.label : "", grams: u?.grams })),
+    yieldRatio: src.yieldRatio ?? null,
+  };
+}
+
+/** Edit a Food: any Member may. Its id and createdBy stay; Entries logged from it keep their snapshot. */
+async function putFood(id: string, input: unknown): Promise<Food> {
+  const r = editedFood(asEdit(input));
+  if (!r.ok) throw invalid(r.error);
+  const all = await listFoods();
+  const existing = all.find((f) => f.id === id);
+  if (!existing) throw new UserError("NotFound", "That Food is no longer in the Library");
+  const clash = all.find((f) => f.id !== id && foodNameKey(f.name) === foodNameKey(r.food.name));
+  if (clash) throw invalid(`The Library already has ${clash.name}`);
+  const food: Food = { id, ...r.food, createdBy: existing.createdBy, updatedAt: Math.max(Date.now(), existing.updatedAt) };
+  try {
+    // Only replace a Food that is still there, so an edit racing a delete doesn't bring it back.
+    await ddb().send(new PutCommand({ TableName: TABLE, Item: { PK: HOUSEHOLD_PK, SK: foodKey(id), ...food }, ConditionExpression: "attribute_exists(PK)" }));
+  } catch (e) {
+    if ((e as Error).name === "ConditionalCheckFailedException") throw new UserError("NotFound", "That Food is no longer in the Library");
+    throw e;
+  }
+  return food;
+}
+
+
+/** Every Member's username (the handler's allowlist), read per call so tests can set it. */
+const members = () => (process.env.ALLOWED_USERNAMES ?? "").split(",").filter(Boolean);
+
+/**
+ * Delete a Food and, in the same transaction, every Member's Favorite of it, so it drops out of
+ * everyone's Quick Add. Entries keep their snapshot and their (now dangling) reference. Deleting
+ * a Food that's already gone succeeds, so a retry is harmless.
+ */
+async function deleteFood(id: string): Promise<string> {
+  const del = (PK: string, SK: string) => ({ Delete: { TableName: TABLE, Key: { PK, SK } } });
+  await ddb().send(
+    new TransactWriteCommand({
+      TransactItems: [...members().map((u) => del(memberPk(u), favoriteKey(id))), del(HOUSEHOLD_PK, foodKey(id))],
+    }),
+  );
+  return id;
+}
+
 export const library: ResolverModule = {
   Query: {
     /** The whole shared Library; the same for every Member. */
@@ -63,5 +125,8 @@ export const library: ResolverModule = {
       return { foods: await listFoods() };
     },
   },
-  Mutation: {},
+  Mutation: {
+    putFood: (_ctx, args) => putFood(foodId(args.id), args.input),
+    deleteFood: (_ctx, args) => deleteFood(foodId(args.id)),
+  },
 };
