@@ -56,6 +56,21 @@ describe("entryFromEstimate (logging a Bedrock estimate)", () => {
   });
 });
 
+describe("entryFromEstimate for an estimate asked for an amount in a unit", () => {
+  const rice = { carbs: 67.5, protein: 6, fat: 0.6, fiber: 0.9, sodium: 3, iron: 0.6, calories: 307.5 };
+  const est = { name: "rice", nutrition: rice, servingGrams: 237, yieldRatio: null, units: [], food: null };
+
+  it("logs Bedrock's estimate as is, at the amount and unit asked", () => {
+    expect(entryFromEstimate(est, "dinner", { amount: 1.5, unit: "cup" }, { amount: 1.5, unit: "cup" }))
+      .toEqual({ ok: true, entry: { meal: "dinner", name: "rice", amount: 1.5, unit: "cup", nutrition: rice, grams: 237 } });
+  });
+
+  it("in g, the grams are the amount", () => {
+    expect(entryFromEstimate({ ...est, servingGrams: 140 }, "dinner", { amount: 150, unit: "g" }, { amount: 150, unit: "g" }))
+      .toMatchObject({ ok: true, entry: { amount: 150, unit: "g", grams: 150, nutrition: rice } });
+  });
+});
+
 const food = (name: string, servingGrams: number | null, units: { label: string; grams: number }[] = [], id = "f1"): Food => ({
   id, createdBy: "asher", updatedAt: 1,
   ...foodFromServing({ name, nutrition: { carbs: 1.2, protein: 12.6, fat: 10.1, fiber: 0, sodium: 342, iron: 1.8, calories: 180 }, servingGrams, units }),
@@ -84,8 +99,8 @@ describe("formUnits (what the unit picker offers)", () => {
     expect(formUnits({ ...recipe, preparedGrams: 1200 }, false)).toEqual(["batch", "g"]);
   });
 
-  it("offers serving and g for a new Food, and only serving when typing nutrition by hand", () => {
-    expect(formUnits(undefined, false)).toEqual(["serving", "g"]);
+  it("offers the common units for a new Food, and only serving when typing nutrition by hand", () => {
+    expect(formUnits(undefined, false)).toEqual(["serving", "g", "oz", "cup", "tbsp", "tsp", "slice", "piece"]);
     expect(formUnits(library[0], true)).toEqual(["serving"]);
   });
 });

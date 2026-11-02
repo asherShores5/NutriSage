@@ -1,6 +1,6 @@
 // The Entry form's rules (estimated or hand-typed), kept pure so they're testable without a DOM.
 import {
-  GRAMS, NUTRIENTS, SERVING, isRecipe, logFood, parseAmount, recipeUnits, scaleSnapshot, servingUnits,
+  GRAMS, NEW_FOOD_UNITS, NUTRIENTS, SERVING, isRecipe, logFood, parseAmount, recipeUnits, scaleSnapshot, servingUnits,
   type Amount, type Entry, type LibraryItem, type Meal, type NutrientKey, type Nutrition,
 } from "@nutrisage/shared";
 import type { Estimate } from "../../api/estimate";
@@ -40,9 +40,17 @@ export function readEntryForm({ name, meal, values, amount }: EntryFormValues): 
 
 /**
  * The Entry for `to` of an estimated serving. Once the estimate is saved to the Library, it logs from
- * that Food (pointing at it); otherwise Bedrock's serving scaled, plus grams when known.
+ * that Food (pointing at it); otherwise Bedrock's serving scaled, plus grams when known. `asked`: the
+ * estimate was made for exactly that amount in a unit (a new Food in the add box), so it's logged as
+ * is when the saved Food can't log it (e.g. a same-named Food without that unit).
  */
-export function entryFromEstimate(est: Estimate, meal: Meal, to: Amount): EntryFormResult {
+export function entryFromEstimate(est: Estimate, meal: Meal, to: Amount, asked?: Amount): EntryFormResult {
+  if (asked) {
+    const fromFood = est.food ? logFood(est.food, to, meal) : undefined;
+    if (fromFood?.ok) return fromFood;
+    const grams = to.unit === GRAMS ? to.amount : est.servingGrams;
+    return { ok: true, entry: { meal, name: est.name, amount: to.amount, unit: to.unit, nutrition: est.nutrition, ...(grams ? { grams } : {}) } };
+  }
   if (est.food) return logFood(est.food, to, meal);
   const r = scaleSnapshot({ nutrition: est.nutrition, grams: est.servingGrams }, { amount: 1, unit: SERVING }, to, servingUnits(est.servingGrams));
   if (!r.ok) return r;
@@ -51,11 +59,11 @@ export function entryFromEstimate(est: Estimate, meal: Meal, to: Amount): EntryF
 
 /**
  * Unit labels for the add box: the picked Library Food's own units, a picked Recipe's (batch, and g
- * once its Prepared weight is known), serving and g for a new Food (Bedrock gives the serving's
- * weight), only serving by hand.
+ * once its Prepared weight is known), the common units for a new Food (NEW_FOOD_UNITS: Bedrock
+ * estimates the amount in the picked unit), only serving by hand.
  */
 export function formUnits(picked: LibraryItem | undefined, byHand: boolean): string[] {
   if (byHand) return [SERVING];
-  if (!picked) return [SERVING, GRAMS];
+  if (!picked) return [...NEW_FOOD_UNITS];
   return isRecipe(picked) ? recipeUnits(picked) : picked.units.map((u) => u.label);
 }

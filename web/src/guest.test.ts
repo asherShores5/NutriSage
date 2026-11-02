@@ -156,6 +156,15 @@ describe("a Guest", () => {
     expect(requests).toEqual([{ url: "https://guest.example/estimate", body: { text: "apple" } }]);
   });
 
+  it("estimates an amount in a picked unit through the Guest endpoint; the device Food gets that unit", async () => {
+    const { session, estimate } = await launch();
+    session.enterGuest();
+    guestReply = { status: 200, body: { name: "rice", nutrition: { carbs: 67.5, protein: 6, fat: 0.6, fiber: 0.9, sodium: 3, iron: 0.6, calories: 307.5 }, servingGrams: 237, yieldRatio: null, units: [] } };
+    const r = await estimate.estimate("rice", { portion: { amount: 1.5, unit: "cup" } });
+    expect(requests).toEqual([{ url: "https://guest.example/estimate", body: { text: "rice", amount: 1.5, unit: "cup" } }]);
+    expect(r.food?.units).toContainEqual({ label: "cup", grams: 158 });
+  });
+
   it("has the demo Library as Foods per gram, from this device only", async () => {
     const { session, library } = await launch();
     session.enterGuest();

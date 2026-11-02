@@ -4,7 +4,7 @@
 type Estimate {
   "The food text as estimated (trimmed, at most 200 characters)."
   name: String!
-  "For the serving named in the text, or one typical serving."
+  "For the serving named in the text, or one typical serving (for the whole amount when asked with amount and unit)."
   nutrition: Nutrition!
   "Gram weight of that serving, or null when the model gave no believable one."
   servingGrams: Float
@@ -17,6 +17,6 @@ type Estimate {
 }
 
 extend type Mutation {
-  "Estimate one serving of `text` (e.g. \"2 eggs scrambled\") and save it to the shared Library. Set ingredient for a Recipe ingredient's Yield ratio."
-  estimate(text: String!, ingredient: Boolean): Estimate!
+  "Estimate one serving of `text` (e.g. \"2 eggs scrambled\") and save it to the shared Library. Set ingredient for a Recipe ingredient's Yield ratio. With amount and unit (one of the add box's units for a new Food, other than serving), estimate exactly that amount; the saved Food gets that unit."
+  estimate(text: String!, ingredient: Boolean, amount: Float, unit: String): Estimate!
 }

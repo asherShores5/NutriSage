@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findFoodByName, foodFromServing, foodNameKey, foodUnits, logFood, type Food } from "./food";
+import { NEW_FOOD_UNITS, findFoodByName, foodFromServing, foodNameKey, foodUnits, logFood, portionedServing, type Food } from "./food";
 
 const EGGS = { carbs: 1.2, protein: 12.6, fat: 10.1, fiber: 0, sodium: 342, iron: 1.8, calories: 180 };
 /** Numbers rounded to 6 places, so float noise doesn't fail an exact comparison. */
@@ -83,5 +83,33 @@ describe("Food names (deduplicated case-insensitively)", () => {
   it("doesn't match a different name", () => {
     expect(findFoodByName(foods, "greek yogurt with honey")).toBeUndefined();
     expect(findFoodByName(foods, "")).toBeUndefined();
+  });
+});
+
+describe("a new Food estimated for an amount in a unit (the add box with no Library Food picked)", () => {
+  const RICE = { carbs: 67.5, protein: 6, fat: 0.6, fiber: 0.9, sodium: 3, iron: 0.6, calories: 307.5 }; // 1 1/2 cup cooked rice
+  const est = { name: "rice", nutrition: RICE, servingGrams: 237, units: [{ label: "cup", grams: 150 }, { label: "bowl", grams: 300 }] };
+
+  it("offers the common units: serving, g, oz, cup, tbsp, tsp, slice, piece", () => {
+    expect(NEW_FOOD_UNITS).toEqual(["serving", "g", "oz", "cup", "tbsp", "tsp", "slice", "piece"]);
+  });
+
+  it("gets that unit with Bedrock's grams (one of it is the serving), so logging 1 1/2 cup matches the estimate", () => {
+    const food = { id: "r", createdBy: "asher", updatedAt: 1, ...foodFromServing(portionedServing(est, { amount: 1.5, unit: "cup" })) };
+    expect(food.units).toEqual([{ label: "serving", grams: 158 }, { label: "g", grams: 1 }, { label: "cup", grams: 158 }, { label: "bowl", grams: 300 }]);
+    const r = logFood(food, { amount: 1.5, unit: "cup" }, "dinner");
+    expect(r.ok && tidy(r.entry.nutrition)).toEqual(RICE);
+    expect(r.ok && r.entry.grams).toBe(237);
+  });
+
+  it("in g, the serving is the weighed amount", () => {
+    const s = portionedServing({ ...est, servingGrams: 140 }, { amount: 150, unit: "g" });
+    expect(s).toMatchObject({ servingGrams: 150, nutrition: RICE });
+  });
+
+  it("with no gram weight from Bedrock, one of the unit is one serving (unweighed)", () => {
+    const s = portionedServing({ ...est, servingGrams: null }, { amount: 2, unit: "slice" });
+    expect(s.servingGrams).toBeNull();
+    expect(s.nutrition.calories).toBeCloseTo(153.75);
   });
 });

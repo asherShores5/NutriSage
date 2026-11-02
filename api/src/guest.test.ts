@@ -140,6 +140,13 @@ describe("Guest requests", () => {
     expect((await g.post({ text: "dry rice" })).body.yieldRatio).toBeNull();
   });
 
+  it("estimates exactly an amount in a picked unit, like the Member estimate; a unit it doesn't offer is a 400", async () => {
+    h.bedrock.reply(JSON.stringify({ ...EGGS, servingGrams: 237 }));
+    expect((await g.post({ text: "rice", amount: 1.5, unit: "cup" })).body.servingGrams).toBe(237);
+    expect(h.bedrock.lastPrompt()).toContain("Amount: 1 1/2 cup");
+    expect((await g.post({ text: "rice", amount: 1, unit: "bucket" })).status).toBe(400);
+  });
+
   it("a Bedrock failure is a plain 503 with the usual message", async () => {
     h.bedrock.fail(Object.assign(new Error("Rate exceeded"), { name: "ThrottlingException" }));
     const r = await g.post({ text: "apple" });

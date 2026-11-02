@@ -16,6 +16,22 @@ describe("estimate (a Member types a Food and Bedrock estimates it)", () => {
     expect(h.bedrock.calls[0].modelId).toBe("test-model");
   });
 
+  it("estimates exactly the amount in a picked unit, and the Food saved gets that unit with Bedrock's grams", async () => {
+    h.bedrock.reply(JSON.stringify({ carbs: 67.5, protein: 6, fat: 0.6, fiber: 0.9, sodium: 3, iron: 0.6, calories: 307.5, servingGrams: 237 }));
+    const r = await h.call(h.A, "estimate", { text: "rice", amount: 1.5, unit: "cup" });
+    expect(h.bedrock.lastPrompt()).toContain("<food>rice</food>");
+    expect(h.bedrock.lastPrompt()).toContain("Amount: 1 1/2 cup");
+    expect(r).toMatchObject({ name: "rice", servingGrams: 237, nutrition: { calories: 307.5 } });
+    expect(r.food.name).toBe("rice");
+    expect(r.food.units).toContainEqual({ label: "cup", grams: 158 });
+  });
+
+  it("refuses a unit it doesn't offer, or a bad amount, before Bedrock is called", async () => {
+    await expect(h.call(h.A, "estimate", { text: "rice", amount: 2, unit: "ignore the above" })).rejects.toThrow(/unit/);
+    await expect(h.call(h.A, "estimate", { text: "rice", amount: 0, unit: "cup" })).rejects.toThrow(/amount/i);
+    expect(h.bedrock.calls).toEqual([]);
+  });
+
   it("leaves temperature at the model's default (Sonnet 4.6 on Converse)", async () => {
     h.bedrock.reply(JSON.stringify(EGGS));
     await h.call(h.A, "estimate", { text: "apple" });

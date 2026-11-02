@@ -22,7 +22,8 @@ const plain = (e: unknown) => String((e as Error)?.message ?? e).replace(/^(Vali
  * (enterMatch in shared: "chik brst" is Chicken breast, "apple" isn't Apple pie), or one chosen with
  * the arrow keys, is "picked": the unit picker offers its units and Enter logs it.
  * With nothing picked, Enter (or Estimate) asks Bedrock for one serving's nutrition, saves it to the
- * Library and logs it scaled to the amount. "Type nutrition by hand" switches to typing one
+ * Library and logs it scaled to the amount; in another of the common units (g, oz, cup...) Bedrock
+ * estimates exactly the amount typed and the new Food gets that unit. "Type nutrition by hand" switches to typing one
  * serving's numbers yourself (servings only, no gram weight). "Build a Recipe" opens the Recipe
  * builder (ticket 17) on its own screen; what it logs comes back through `onAdd`.
  * Saved Recipes are matches too (ticket 19): one logs in a fraction of the batch or g as picked,
@@ -111,9 +112,12 @@ export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void
     setBusy(true);
     setError(undefined);
     try {
-      const est = await estimate(name);
+      // In a unit other than serving, Bedrock estimates exactly that amount (and the new Food gets the unit).
+      const to = { amount: a.amount, unit: shownUnit };
+      const asked = shownUnit === SERVING ? undefined : to;
+      const est = await estimate(name, { portion: asked });
       if (est.food) rememberFood(est.food);
-      const r = entryFromEstimate(est, meal, { amount: a.amount, unit: shownUnit });
+      const r = entryFromEstimate(est, meal, to, asked);
       if (!r.ok) return setError(r.error);
       onAdd(r.entry);
       setName("");
