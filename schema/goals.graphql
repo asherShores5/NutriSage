@@ -1,4 +1,4 @@
-# Goals (ticket 04) and Meal windows (ticket 07). Resolvers: api/src/resolvers/goals.ts.
+# Goals (ticket 04); Meal windows are in mealWindows.graphql. Resolvers: api/src/resolvers/goals.ts.
 
 "A Member's daily targets. 0 means no goal for that nutrient."
 type Goals {

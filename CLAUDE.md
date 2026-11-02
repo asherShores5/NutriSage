@@ -97,6 +97,15 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   account yet); it sets `MODEL_ID` and an InvokeModel grant on the profile + its 4 US model ARNs.
   The estimate core (prompt, length cap, lenient parse) is `api/src/estimate.ts`, shared by the
   Member `estimate` mutation and the Guest endpoint; tests stub Bedrock via `testing/fakeBedrock.ts`.
+- **Guest mode** (ticket 10): `web/src/session.ts` holds the Guest flag; `web/src/api/*.ts` check
+  `isGuest()` and answer from browser storage (`web/src/guest/store.ts`, seeded by `guestSeed` in
+  shared) or the Guest endpoint, so screens never branch on Guests. New api/ modules (goals,
+  Library, Favorites) must add the same branch; a Guest never sees the household Library.
+  The Guest endpoint is `api/src/guest.ts` behind its own public HTTP API (`infra/lib/guest.ts`,
+  output `GuestEstimateUrl`, `guestEstimateUrl` in config.json). It must never import `table.ts`
+  or `resolvers/`; its role has only Bedrock + UpdateItem on the Guest cap table. Caps
+  (`GUEST_CAPS`: per IP or IPv6 /64, and a global ceiling, per UTC day) are checked in one
+  transaction before Bedrock; counters hold a hash of day + network, never the IP, and expire by TTL.
 - **The old backend** (until ticket 24): an Organizations SCP blocks public Lambda Function URLs,
   which is why it sits behind an HTTP API. Its `update-function-configuration --environment`
   replaces the whole variable map, so re-send every variable together.

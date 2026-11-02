@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MEALS, MEAL_LABELS, NUTRIENTS, type Entry, type Meal } from "@nutrisage/shared";
 import { estimate } from "../../api/estimate";
+import { useMealPick } from "./useMealPick";
 import { blankNutrientValues, entryFromEstimate, readEntryForm } from "./entryForm";
 
 /** "ValidationError: Type a Food" -> "Type a Food": the API's error type isn't for people. */
@@ -12,7 +13,7 @@ const plain = (e: unknown) => String((e as Error)?.message ?? e).replace(/^(Vali
  */
 export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void }) {
   const [name, setName] = useState("");
-  const [meal, setMeal] = useState<Meal>("breakfast");
+  const [meal, setMeal] = useMealPick();
   const [byHand, setByHand] = useState(false);
   const [values, setValues] = useState(blankNutrientValues);
   const [busy, setBusy] = useState(false);

@@ -1,16 +1,35 @@
 import { useEffect, useState } from "react";
 import { currentUsername, listPasskeys, registerPasskey, signOut } from "../../auth";
+import { isGuest, leaveGuest } from "../../session";
+import { MealWindowsCard } from "./MealWindowsCard";
 import { ThemePicker } from "./ThemePicker";
 
-/** The Profile tab: who's signed in, theme, passkeys and sign out. Meal windows (07) land here. */
+/** The Profile tab: who's signed in, Meal windows, theme, passkeys and sign out. */
 export function Profile() {
+  if (isGuest()) return <GuestProfile />;
   return (
     <div className="profile">
       <h2>Profile</h2>
       <p>Signed in as <strong>{currentUsername()}</strong></p>
+      <MealWindowsCard />
       <ThemePicker />
       <Passkeys />
       <button onClick={() => void signOut()}>Sign out</button>
+    </div>
+  );
+}
+
+/** A Guest's Profile: what Guest mode means, and the way out (which deletes the Guest's data). */
+function GuestProfile() {
+  function leave() {
+    if (confirm("Leave Guest mode? Everything you logged as a Guest is deleted from this device.")) leaveGuest();
+  }
+  return (
+    <div className="profile">
+      <h2>Profile</h2>
+      <p>You're using NutriSage as a <strong>Guest</strong>.</p>
+      <p className="hint">What you log stays on this device. Estimates are limited each day; typing nutrition by hand is not.</p>
+      <button className="leave-guest" onClick={leave}>Leave Guest mode</button>
     </div>
   );
 }

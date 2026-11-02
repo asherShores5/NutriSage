@@ -13,6 +13,7 @@ import {
 import type { Construct } from "constructs";
 import { composeSchemaDir, rootFields } from "../../schema/compose";
 import { allowEstimates } from "./estimate";
+import { GuestEstimate } from "./guest";
 
 /** Served by the hosting stacks (ticket 11). */
 export const APP_DOMAIN = "nutrisage.ashershores.com";
@@ -117,6 +118,9 @@ export class AppStack extends Stack {
     for (const typeName of ["Query", "Mutation"] as const) {
       for (const fieldName of fields[typeName]) ds.createResolver(`${typeName[0]}${fieldName}`, { typeName, fieldName });
     }
+
+    // ---- Guest estimates: a separate public endpoint with no access to the table above ----
+    new GuestEstimate(this, "GuestEstimate", { root: ROOT, allowOrigins: [`https://${APP_DOMAIN}`] });
 
     new CfnOutput(this, "Region", { value: this.region });
     new CfnOutput(this, "UserPoolId", { value: userPool.userPoolId });

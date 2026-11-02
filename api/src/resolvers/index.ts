@@ -6,9 +6,10 @@ import { estimate } from "./estimate";
 import { favorites } from "./favorites";
 import { goals } from "./goals";
 import { library } from "./library";
+import { mealWindows } from "./mealWindows";
 import type { Resolver, ResolverModule } from "./types";
 
-const MODULES: ResolverModule[] = [days, estimate, favorites, goals, library];
+const MODULES: ResolverModule[] = [days, estimate, favorites, goals, library, mealWindows];
 
 function merge(type: "Query" | "Mutation"): Record<string, Resolver> {
   const out: Record<string, Resolver> = {};
