@@ -1,43 +1,24 @@
-// One Day, loaded from the API and written back whole after each change (Entries, water and
-// weight together: last write wins per Day). Writes go out one at a time in order, so quick taps
-// (e.g. water cups) can't land out of order. Ticket 09 replaces the direct writes with a local
-// copy + outbox for offline use; screens keep using this hook.
-import { useCallback, useEffect, useRef, useState } from "react";
+// One Day for a screen. Reads and writes go through the Member's local copy (sync/memberData.ts):
+// the Day on this device shows at once, each change is saved on the device and queued in the
+// outbox (whole Day: Entries, water and weight together, last write wins per Day), and the
+// server copy loads in the background and again whenever the app comes back to the front.
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import type { Day } from "@nutrisage/shared";
-import { getDays, putDay } from "../../api/days";
+import { dayError, getDay, saveDay, subscribe, watchDay } from "../../sync/memberData";
 
 export function useDay(date: string) {
-  const [day, setDay] = useState<Day>();
-  const [error, setError] = useState<string>();
-  const latest = useRef<Day>(undefined);
-  const queue = useRef<Promise<void>>(Promise.resolve());
+  const day = useSyncExternalStore(subscribe, () => getDay(date));
+  const error = useSyncExternalStore(subscribe, () => dayError(date));
+  useEffect(() => watchDay(date), [date]);
 
-  useEffect(() => {
-    let live = true;
-    latest.current = undefined;
-    setDay(undefined);
-    getDays(date, date).then(
-      ([d]) => {
-        if (!live) return;
-        latest.current = d ?? { date, entries: [], water: null, weight: null };
-        setDay(latest.current);
-      },
-      (e) => live && setError((e as Error).message),
-    );
-    return () => {
-      live = false;
-    };
-  }, [date]);
-
-  /** Apply a change now and save the whole Day. On failure the error shows and the change stays on screen. */
-  const update = useCallback((change: (d: Day) => Day) => {
-    if (!latest.current) return;
-    const next = change(latest.current);
-    latest.current = next;
-    setDay(next);
-    setError(undefined);
-    queue.current = queue.current.then(() => putDay(next).then(() => {}, (e) => setError((e as Error).message)));
-  }, []);
+  /** Apply a change now and queue the whole Day. If the API refuses it, the error shows and the Day reloads. */
+  const update = useCallback(
+    (change: (d: Day) => Day) => {
+      const current = getDay(date);
+      if (current) saveDay(change(current));
+    },
+    [date],
+  );
 
   return { day, error, update };
 }

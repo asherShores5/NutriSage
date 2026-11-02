@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { DEFAULT_WATER_GOAL, dateKey, moveEntry, sumMacros, type Entry, type EntryMove } from "@nutrisage/shared";
-import { getDays, putDay } from "../../api/days";
 import { Bars } from "../../components/Bars";
+import { readDay, saveDay } from "../../sync/memberData";
 import { useGoals } from "../goals/useGoals";
 import { DayNav } from "./DayNav";
 import { EntryForm } from "./EntryForm";
@@ -25,16 +25,16 @@ export function Today() {
   /**
    * Move an Entry to another Day (and maybe Meal). The destination Day is written first, then this
    * Day: a failure in between leaves the Entry on both Days rather than on neither.
-   * Ticket 09 (outbox) routes the destination write through the local copy.
+   * Both writes go through the outbox in that order, so a move made offline lands the same way.
    */
   async function moveToDay(id: string, to: EntryMove & { date: string }) {
     if (!day) return;
     setMoveError(undefined);
     try {
-      const [target] = await getDays(to.date, to.date);
+      const target = await readDay(to.date);
       const writes = moveEntry(day, id, to, target);
       if (writes.length < 2) return;
-      await putDay(writes[1]);
+      saveDay(writes[1]);
       update((d) => ({ ...d, entries: d.entries.filter((e) => e.id !== id) }));
     } catch (e) {
       setMoveError((e as Error).message);
