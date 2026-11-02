@@ -14,9 +14,12 @@ Not a workspace, so CI never installs it.
     npx tsx parity.ts          # Today parity: Goals, every Meal incl. Dessert, bars, water, weight, theme
     npx tsx move.ts            # move an Entry to another Meal and Day, delete one; Day navigation, Clear day
     npx tsx estimate.ts        # type a Food, log the (stubbed) Bedrock estimate
+    npx tsx offline.ts         # log offline, reload offline (service worker), sync back; phone -> desktop on focus
     npx tsx amounts.ts         # amounts (1 1/2, 1/3), unit picker, quick picks, rescaling in the editor
     npx tsx library.ts         # an estimate joins the shared Library; the other Member logs it by amount x unit
     npx tsx week.ts            # Week streak/averages/total vs seeded Days; Trends metric chart
+    npx tsx trends.ts          # Trends gaps: no data on unlogged Days, dashed bridges, today in progress
+    npx tsx trendsYAxis.ts     # Trends Y-axis: fit, from 0, manual min/max; goal line (water goal; none for weight)
     npx tsx guest.ts           # Guest mode: demo data, capped estimates (cap 2 here), leave Guest mode
     npx tsx passkeys.ts        # add a passkey, sign in with it (virtual authenticator), password backup
     npx tsx mealWindows.ts     # Meal windows (faked clock): guess on open, a pick sticks, rollover, Profile edit
@@ -27,5 +30,5 @@ worktrees don't overwrite each other. Add a new check script per feature area (e
 using `checklist()` from `lib.ts`, and add its screens to `tour.ts`.
 
 Not covered: real device passkeys (Face ID, iCloud Keychain, phone QR; `passkeys.ts` uses a
-Chromium virtual authenticator), iOS install quirks, offline launch (service workers are
-blocked so routes see every request).
+Chromium virtual authenticator), iOS install quirks. Service workers are blocked unless a check
+opts in (`offline.ts` does).

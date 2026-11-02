@@ -8,7 +8,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, devices, type Browser, type Page } from "playwright";
+import { chromium, devices, type Browser, type BrowserContext, type Page } from "playwright";
 import { cognito, graphql, guestRequest } from "./backend";
 
 export const ORIGIN = "https://nutrisage.test";
@@ -36,6 +36,8 @@ export interface OpenOptions {
    * verification. Its passkeys live in this browser context only, like a real device's.
    */
   authenticator?: boolean;
+  /** Let the app's service worker run (off by default, so routes see every request). */
+  serviceWorkers?: boolean;
   /** Fake the page's clock from this moment (Playwright clock: timers and Date; time keeps running). */
   clock?: Date | string;
 }
@@ -47,7 +49,7 @@ export async function launch() {
   async function open(username: string, opts: OpenOptions = {}) {
     const screen = opts.device === "desktop" ? { viewport: { width: 1280, height: 800 } } : devices["iPhone 13"];
     const context = await browser.newContext({
-      ...screen, serviceWorkers: "block", timezoneId: "America/Los_Angeles", colorScheme: opts.dark ? "dark" : "light",
+      ...screen, serviceWorkers: opts.serviceWorkers ? "allow" : "block", timezoneId: "America/Los_Angeles", colorScheme: opts.dark ? "dark" : "light",
     });
     if (opts.clock) await context.clock.install({ time: opts.clock });
     const page = await context.newPage();
@@ -107,3 +109,25 @@ export function todayKey(now = Date.now()): string {
 }
 
 export type { Page };
+
+const offlineContexts = new WeakMap<BrowserContext, { offline: boolean }>();
+
+/**
+ * Take a page's browser context off the network (or back on). Chromium's offline mode alone still
+ * lets routed requests through, so every request this context makes (the page's and its service
+ * worker's) is aborted too while offline.
+ */
+export async function setOffline(page: Page, offline: boolean) {
+  const context = page.context();
+  let gate = offlineContexts.get(context);
+  if (!gate) {
+    const g = { offline: false };
+    gate = g;
+    offlineContexts.set(context, g);
+    // Registered last, so it runs before the fake-backend routes and falls back to them when online.
+    await context.route("**/*", (route) => (g.offline ? route.abort("internetdisconnected") : route.fallback()));
+  }
+  gate.offline = offline;
+  await context.setOffline(offline);
+}
+
