@@ -133,16 +133,16 @@ describe("deploy role (GitHub OIDC)", () => {
     ci.resourceCountIs("AWS::IAM::OIDCProvider", 0);
   });
 
-  it("only jobs in this repo's production environment can assume it, by name or by immutable ID", () => {
+  it("only jobs in this repo's production environment can assume it: by immutable ID, or by the new name only", () => {
     const [role] = Object.values(ci.findResources("AWS::IAM::Role"));
     const [statement] = role.Properties.AssumeRolePolicyDocument.Statement;
     expect(statement.Action).toBe("sts:AssumeRoleWithWebIdentity");
     expect(JSON.stringify(statement.Principal)).toContain("oidc-provider/token.actions.githubusercontent.com");
     expect(statement.Condition.StringEquals["token.actions.githubusercontent.com:aud"]).toBe("sts.amazonaws.com");
     expect([...statement.Condition.StringEquals["token.actions.githubusercontent.com:sub"]].sort()).toEqual([
-      // The repo is renamed to NutriSage at cutover; both names stay trusted, and the ID form survives renames.
+      // GitHub sends the ID form (owner@id/repo@id) for this owner, so deploys before and after the
+      // rename match by ID. The old name is never trusted by name alone: a stub repo takes it after cutover.
       "repo:asherShores5/NutriSage:environment:production",
-      "repo:asherShores5/NutriSageAI:environment:production",
       `repo:asherShores5@71547146/NutriSage@${REPO_ID}:environment:production`,
       `repo:asherShores5@71547146/NutriSageAI@${REPO_ID}:environment:production`,
     ]);

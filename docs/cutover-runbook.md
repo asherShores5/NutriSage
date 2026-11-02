@@ -173,20 +173,10 @@ delete the old icon and add the new site with Share > Add to Home Screen (deploy
 Notes:
 - Creating a repo with the old name ends GitHub's redirect from `github.com/asherShores5/NutriSageAI`
   to the renamed repo. That's why step 4 updates the git remotes first.
-- The stub repo has no workflows and no `production` environment; keep it that way. The deploy role
-  still trusts the old name's `production` subject, so a `production` environment in the stub could
-  deploy. Close that by removing the old name from the trust (same day, normal PR + prod deploy):
-
-  ```diff
-  --- a/infra/lib/ci.ts
-  -/** The repo's names: it's renamed from NutriSageAI to NutriSage at cutover (spec), so both are trusted. */
-  -export const GITHUB_REPO_NAMES = ["NutriSageAI", "NutriSage"];
-  +/** The repo's name (renamed from NutriSageAI at cutover; that name is now the Pages redirect stub). */
-  +export const GITHUB_REPO_NAMES = ["NutriSage"];
-  ```
-
-  Ship it after the rename (the deploy runs as `NutriSage`). `infra/test/hosting.test.ts` pins the
-  trusted subjects: drop its two `NutriSageAI` subject lines in the same change. Also update `gh api repos/asherShores5/NutriSageAI` to `.../NutriSage` in
+- The stub repo has no workflows and no `production` environment; keep it that way. It can't deploy
+  either way: the deploy role trusts the old name only in GitHub's ID form, pinned to the real
+  repo's ID (`infra/lib/ci.ts`), and the stub gets a new ID. Nothing to change in the role after the
+  rename. Do update `gh api repos/asherShores5/NutriSageAI` to `.../NutriSage` in
   `docs/deploy-runbook.md` step 1.
 
 ## 6. Point the App Connector Tile at the new NutriSage
