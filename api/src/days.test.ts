@@ -82,3 +82,35 @@ describe("Day validation", () => {
     await bad(day("2026-11-02", Array.from({ length: 201 }, (_, i) => entry(`e${i}`, "x"))));
   });
 });
+
+describe("water and weight on a Day", () => {
+  it("a Day write carries Entries, water and weight together, and reads back the same", async () => {
+    await h.call(h.A, "putDay", { input: { ...day("2026-11-02", [entry("e1", "Oatmeal")]), water: 3, weight: 171.4 } });
+    const [d] = await h.call(h.A, "days", { from: "2026-11-02", to: "2026-11-02" });
+    expect(d).toMatchObject({ entries: [{ id: "e1" }], water: 3, weight: 171.4 });
+  });
+
+  it("a Day with only water or only weight logged is still a Day", async () => {
+    await h.call(h.A, "putDay", { input: { ...day("2026-11-01", []), water: 2 } });
+    await h.call(h.A, "putDay", { input: { ...day("2026-11-02", []), weight: 170 } });
+    const days = await h.call(h.A, "days", { from: "2026-11-01", to: "2026-11-02" });
+    expect(days.map((d: { water: number | null; weight: number | null }) => [d.water, d.weight])).toEqual([[2, null], [null, 170]]);
+  });
+
+  it("clearing weight (null) leaves no weight; a later write without water drops the water", async () => {
+    await h.call(h.A, "putDay", { input: { ...day("2026-11-02", []), water: 4, weight: 170 } });
+    await h.call(h.A, "putDay", { input: { ...day("2026-11-02", []), water: 4, weight: null } });
+    let [d] = await h.call(h.A, "days", { from: "2026-11-02", to: "2026-11-02" });
+    expect([d.water, d.weight]).toEqual([4, null]);
+    await h.call(h.A, "putDay", { input: day("2026-11-02", [entry("e1", "x")]) });
+    [d] = await h.call(h.A, "days", { from: "2026-11-02", to: "2026-11-02" });
+    expect([d.water, d.weight]).toEqual([null, null]);
+  });
+
+  it("refuses fractional or negative cups, and a weight of 0 or less (0 used to mean not logged)", async () => {
+    for (const extra of [{ water: 1.5 }, { water: -1 }, { weight: 0 }, { weight: -3 }, { weight: 2001 }]) {
+      await expect(h.call(h.A, "putDay", { input: { ...day("2026-11-02", []), ...extra } })).rejects.toThrow(/^ValidationError/);
+    }
+    expect(h.db.dump()).toEqual([]);
+  });
+});

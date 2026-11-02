@@ -1,9 +1,4 @@
 /* Today tab. Each tab keeps its own stylesheet next to its components. */
-.totals { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: 0.5rem; margin: 0.75rem 0 1rem; }
-.total { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.65rem; display: flex; flex-direction: column; }
-.total-value { font-size: 1.2rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.total-label { color: var(--muted); font-size: 0.8rem; }
-
 .entry-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; display: grid; gap: 0.6rem; }
 .entry-form-row { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; }
 .nutrient-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: 0.5rem; }
@@ -14,8 +9,26 @@
 .entry-grams { color: var(--muted); font-size: 0.85rem; margin-left: 0.4rem; }
 
 .entry-list { margin-top: 1rem; }
-.meal-group h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 1rem 0 0.4rem; }
+.meal-head { display: flex; justify-content: space-between; align-items: baseline; margin: 1rem 0 0.4rem; }
+.meal-head h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0; }
+.meal-cal { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .meal-group ul { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
-.entry { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 0.75rem; }
 .entry + .entry { border-top: 1px solid var(--border); }
+.entry-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; width: 100%; height: auto; padding: 0.6rem 0.75rem; border: 0; border-radius: 0; background: none; text-align: left; }
+.entry-main { display: grid; gap: 0.15rem; min-width: 0; }
+.entry-name { overflow-wrap: anywhere; }
+.entry-macros { color: var(--muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
 .entry-cal { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.entry-editor { padding: 0 0.75rem 0.75rem; }
+.entry-editor-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+button.danger { color: var(--danger); border-color: var(--danger); background: none; }
+
+.card-head { display: flex; justify-content: space-between; align-items: baseline; width: 100%; }
+.water-count, .weight-current { color: var(--muted); font-variant-numeric: tabular-nums; }
+.cups { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.cup { width: 2.2rem; height: 2.2rem; padding: 0; border: 0; border-radius: var(--radius-sm); background: var(--track); color: var(--muted); }
+.cup.filled { background: color-mix(in srgb, var(--bar) 25%, var(--surface)); }
+.cup.extra { outline: 1px dashed var(--bar); }
+.row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; width: 100%; }
+.weight .row input { flex: 1 1 8rem; }

@@ -1,5 +1,5 @@
 // Walking skeleton (ticket 01): sign in with a password, log an Entry by hand (estimates: estimate.ts), see it on Today
-// with totals; it persists, and only for that Member.
+// with its bars; it persists, and only for that Member.
 import { expect } from "playwright/test";
 import { launch, todayKey } from "./app";
 import { PASSWORD, db } from "./backend";
@@ -42,9 +42,9 @@ await c.check("logs an Entry by hand into a Meal and shows it with totals", asyn
   await form.getByLabel("Carbs").fill("27");
   await form.getByLabel("Calories").fill("105");
   await form.getByRole("button", { name: "Add Entry" }).click();
-  const totals = p.getByRole("region", { name: "Totals" });
-  await expect(totals.locator(".total", { hasText: "Calories" }).locator(".total-value")).toHaveText("205");
-  await expect(totals.locator(".total", { hasText: "Carbs" }).locator(".total-value")).toHaveText("33");
+  const bars = p.getByRole("region", { name: "Progress" });
+  await expect(bars.locator('[data-nutrient="calories"] .bar-value')).toHaveText("205 cal");
+  await expect(bars.locator('[data-nutrient="carbs"] .bar-value')).toHaveText("33 g");
   // Breakfast is listed before Snack.
   await expect(p.getByRole("region", { name: "Entries" }).getByRole("heading")).toHaveText(["Breakfast", "Snack"]);
   await expect.poll(() => (lastCall("putDay")?.args as any)?.input?.entries?.length).toBe(2);

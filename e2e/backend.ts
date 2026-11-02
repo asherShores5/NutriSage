@@ -156,7 +156,7 @@ async function as(username: string, field: string, args: Record<string, unknown>
 
 const n = (carbs: number, protein: number, fat: number, calories: number) => ({ carbs, protein, fat, fiber: 2, sodium: 120, iron: 1, calories });
 
-/** A few Entries for asher on `date` (YYYY-MM-DD), so screens aren't empty. */
+/** A few Entries, water, weight and goals for asher on `date` (YYYY-MM-DD), so screens aren't empty. */
 export async function seed(date: string) {
   await as("asher", "putDay", {
     input: {
@@ -166,6 +166,9 @@ export async function seed(date: string) {
         { id: "s2", meal: "lunch", name: "Turkey sandwich", nutrition: n(45, 28, 12, 410) },
         { id: "s3", meal: "dessert", name: "Dark chocolate square", nutrition: n(6, 1, 5, 70) },
       ],
+      water: 5,
+      weight: 171.4,
     },
   });
+  await as("asher", "putGoals", { input: { carbs: 200, protein: 120, fat: 60, fiber: 30, sodium: 2300, iron: 10, calories: 2000, water: 8 } });
 }

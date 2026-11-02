@@ -12,6 +12,7 @@ export const TABLE = process.env.TABLE_NAME!;
 export const memberPk = (username: string) => `MEMBER#${username}`;
 export const HOUSEHOLD_PK = "HOUSEHOLD";
 export const dayKey = (date: string) => `DAY#${date}`;
+export const GOALS_SK = "GOALS";
 
 export type DocClient = Pick<DynamoDBDocumentClient, "send">;
 
