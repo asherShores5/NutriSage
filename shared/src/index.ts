@@ -6,3 +6,5 @@ export * from "./goals";
 export * from "./mealWindows";
 export * from "./nutrients";
 export * from "./guest";
+export * from "./week";
+export * from "./trends";
