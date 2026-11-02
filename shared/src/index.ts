@@ -2,3 +2,4 @@
 // One file per area; add new areas as their own file plus one line here.
 export * from "./day";
 export * from "./nutrients";
+export * from "./guest";

@@ -62,6 +62,12 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 
 .login { display: grid; gap: 0.75rem; max-width: 22rem; padding-top: 18vh; }
 .hint { color: var(--muted); font-size: 0.85rem; margin: 0; }
+.leave-guest { margin-top: 1rem; }
+.guest-entry { display: grid; gap: 0.5rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.guest-banner {
+  margin: 0; padding: calc(0.4rem + env(safe-area-inset-top)) 1rem 0.4rem; text-align: center;
+  font-size: 0.85rem; color: var(--muted); background: var(--surface); border-bottom: 1px solid var(--border);
+}
 button.link { height: auto; padding: 0.35rem 0; border: 0; background: none; color: var(--accent); }
 .card { display: grid; gap: 0.6rem; justify-items: start; padding: 1rem; margin: 1rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .card h3 { margin: 0; font-size: 1.05rem; }

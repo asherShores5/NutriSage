@@ -13,8 +13,9 @@ beforeAll(() => {
 }, 120_000);
 
 describe("data", () => {
-  it("one PK/SK table, on demand, with point-in-time recovery, deletion protection and RETAIN", () => {
-    app.resourceCountIs("AWS::DynamoDB::GlobalTable", 1);
+  it("one PK/SK Member table, on demand, with point-in-time recovery, deletion protection and RETAIN", () => {
+    // The other table is the Guest cap counters (test/guest.test.ts), which keep no Member data.
+    app.resourceCountIs("AWS::DynamoDB::GlobalTable", 2);
     app.hasResource("AWS::DynamoDB::GlobalTable", {
       DeletionPolicy: "Retain",
       Properties: Match.objectLike({
@@ -107,7 +108,9 @@ describe("Bedrock estimates", () => {
     const statements = Object.values(app.findResources("AWS::IAM::Policy"))
       .flatMap((p) => p.Properties.PolicyDocument.Statement)
       .filter((s: any) => [s.Action].flat().some((a: string) => a.startsWith("bedrock:")));
-    expect(statements).toHaveLength(1);
+    // One grant each for the Member API Lambda and the Guest estimate Lambda, both the same.
+    expect(statements).toHaveLength(2);
+    expect(statements[1]).toEqual(statements[0]);
     const [s] = statements;
     expect(s.Effect).toBe("Allow");
     expect(s.Action).toBe("bedrock:InvokeModel");
@@ -121,7 +124,7 @@ describe("Bedrock estimates", () => {
   });
 
   it("gives the Lambda time for a model call (AppSync waits up to 30 s)", () => {
-    const fns = Object.values(app.findResources("AWS::Lambda::Function")).filter((f) => f.Properties.Environment?.Variables?.MODEL_ID);
+    const fns = Object.values(app.findResources("AWS::Lambda::Function")).filter((f) => f.Properties.Environment?.Variables?.MODEL_ID && f.Properties.Environment.Variables.TABLE_NAME);
     expect(fns).toHaveLength(1);
     expect(fns[0].Properties.Timeout).toBeGreaterThanOrEqual(20);
     expect(fns[0].Properties.Timeout).toBeLessThan(30);
