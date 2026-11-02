@@ -177,7 +177,7 @@ Passkeys can't be automated, so this is the real test of sign-in:
 
 1. Safari: open https://nutrisage.ashershores.com. Sign in with the username and one-time password
    (switch the sign-in form to password).
-2. Profile tab > Passkeys > Add a passkey > Face ID. The count shows "1 passkey on your account."
+2. Profile tab > Passkeys > Add a passkey > Face ID. The count shows "1 passkey saved for you."
 3. Profile > Sign out. Sign in again with "Sign in with passkey": Face ID, no password.
 4. Share > Add to Home Screen. Open NutriSage from the home screen and sign in with the passkey there
    too (the installed app is its own browser context on iOS).

@@ -126,7 +126,7 @@ export async function signInWithPasskey(username: string) {
     ClientId: clientId,
     AuthParameters: { USERNAME: u, PREFERRED_CHALLENGE: "WEB_AUTHN" },
   });
-  if (r.ChallengeName !== "WEB_AUTHN") throw new Error("No passkey on this account yet. Sign in with your password once, then add one in Profile.");
+  if (r.ChallengeName !== "WEB_AUTHN") throw new Error("No passkey saved for you yet. Sign in with your password once, then add one in Profile.");
   const credential = await webauthn(() => startAuthentication({ optionsJSON: JSON.parse(r.ChallengeParameters.CREDENTIAL_REQUEST_OPTIONS) }));
   const done = await cognito("RespondToAuthChallenge", {
     ClientId: clientId,

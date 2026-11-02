@@ -77,7 +77,7 @@ function Passkeys() {
   return (
     <section className="card passkeys" aria-labelledby="passkeys-h">
       <h3 id="passkeys-h">Passkeys</h3>
-      {count !== undefined && <p>{count ? `${plural(count)} on your account.` : "No passkeys yet."}</p>}
+      {count !== undefined && <p>{count ? `${plural(count)} saved for you.` : "No passkeys yet."}</p>}
       <p className="hint">Add one on each device you use, so you can sign in with Face ID instead of your password. Your password still works as a backup.</p>
       <button className="primary" disabled={busy} onClick={add}>Add a passkey</button>
       {error && <p className="error" role="alert">{error}</p>}

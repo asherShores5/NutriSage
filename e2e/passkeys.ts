@@ -16,7 +16,7 @@ await c.check("with no passkey yet, Face ID sign-in says to use the password onc
   c.watch(p);
   await p.getByLabel("Username").fill("asher");
   await p.getByRole("button", { name: "Sign in with passkey" }).click();
-  await expect(p.getByRole("alert")).toHaveText("No passkey on this account yet. Sign in with your password once, then add one in Profile.");
+  await expect(p.getByRole("alert")).toHaveText("No passkey saved for you yet. Sign in with your password once, then add one in Profile.");
   await shot(p, "passkeys-login-phone");
   await p.context().close();
 });
@@ -35,7 +35,7 @@ await c.check("signs in with the password, adds a passkey in Profile, then signs
   const section = p.getByRole("region", { name: "Passkeys" });
   await expect(section.getByText("No passkeys yet.")).toBeVisible();
   await section.getByRole("button", { name: "Add a passkey" }).click();
-  await expect(section.getByText("1 passkey on your account.")).toBeVisible();
+  await expect(section.getByText("1 passkey saved for you.")).toBeVisible();
   if (passkeysOf("asher").length !== 1) throw new Error(`stored ${passkeysOf("asher")}`);
   await shot(p, "passkeys-profile-phone");
 

@@ -153,7 +153,7 @@ describe("passkey sign-in", () => {
   it("with no passkey on the account yet, says to use the password once and stays signed out", async () => {
     cognito.InitiateAuth = [challenge("SELECT_CHALLENGE", { AvailableChallenges: ["PASSWORD"] })];
     const auth = await launch();
-    await expect(auth.signInWithPasskey("asher")).rejects.toThrow("No passkey on this account yet. Sign in with your password once, then add one in Profile.");
+    await expect(auth.signInWithPasskey("asher")).rejects.toThrow("No passkey saved for you yet. Sign in with your password once, then add one in Profile.");
     expect(webauthn.startAuthentication).not.toHaveBeenCalled();
     expect(auth.isSignedIn()).toBe(false);
   });
