@@ -29,6 +29,11 @@ export interface OpenOptions {
   device?: "phone" | "desktop";
   /** Dark color scheme. */
   dark?: boolean;
+  /**
+   * A virtual platform authenticator (stands in for Face ID / Touch ID) that always passes user
+   * verification. Its passkeys live in this browser context only, like a real device's.
+   */
+  authenticator?: boolean;
 }
 
 export async function launch() {
@@ -41,6 +46,13 @@ export async function launch() {
       ...screen, serviceWorkers: "block", timezoneId: "America/Los_Angeles", colorScheme: opts.dark ? "dark" : "light",
     });
     const page = await context.newPage();
+    if (opts.authenticator) {
+      const cdp = await context.newCDPSession(page);
+      await cdp.send("WebAuthn.enable");
+      await cdp.send("WebAuthn.addVirtualAuthenticator", {
+        options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+      });
+    }
     page.on("pageerror", (e) => console.log(`[${username}] pageerror: ${e.message}`));
     page.on("console", (m) => { if (m.type() === "error") console.log(`[${username}] console: ${m.text()}`); });
 

@@ -12,11 +12,12 @@ await c.check("signs in with a password and lands on Today", async () => {
   const p = await app.open("asher", { signedOut: true });
   c.watch(p);
   await p.getByLabel("Username").fill("Asher");
+  await p.getByRole("button", { name: "Use password instead" }).click();
   await p.getByLabel("Password").fill("wrong-password");
-  await p.getByRole("button", { name: "Sign in" }).click();
+  await p.getByRole("button", { name: "Sign in with password" }).click();
   await expect(p.getByRole("alert")).toHaveText("Incorrect username or password.");
   await p.getByLabel("Password").fill(PASSWORD);
-  await p.getByRole("button", { name: "Sign in" }).click();
+  await p.getByRole("button", { name: "Sign in with password" }).click();
   await expect(p.getByRole("heading", { name: "Today" })).toBeVisible();
   await expect(p.getByText("Nothing logged yet today.")).toBeVisible();
   await p.context().close();
@@ -81,7 +82,7 @@ await c.check("Profile signs out back to the sign-in screen", async () => {
   await p.getByRole("button", { name: "Profile" }).click();
   await expect(p.getByText("Signed in as asher")).toBeVisible();
   await p.getByRole("button", { name: "Sign out" }).click();
-  await expect(p.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await expect(p.getByRole("button", { name: "Sign in with passkey" })).toBeVisible();
   await p.context().close();
 });
 
