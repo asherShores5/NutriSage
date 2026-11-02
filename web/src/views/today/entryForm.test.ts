@@ -78,6 +78,12 @@ describe("formUnits (what the unit picker offers)", () => {
     expect(formUnits(library[1], false)).toEqual(["serving"]);
   });
 
+  it("offers a picked Recipe's batch, plus g once its Prepared weight is known", () => {
+    const recipe = { id: "r1", name: "Chili", ingredients: [], preparedGrams: null, createdBy: "asher", updatedAt: 1 };
+    expect(formUnits(recipe, false)).toEqual(["batch"]);
+    expect(formUnits({ ...recipe, preparedGrams: 1200 }, false)).toEqual(["batch", "g"]);
+  });
+
   it("offers serving and g for a new Food, and only serving when typing nutrition by hand", () => {
     expect(formUnits(undefined, false)).toEqual(["serving", "g"]);
     expect(formUnits(library[0], true)).toEqual(["serving"]);

@@ -90,6 +90,12 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   snapshots (name, amount, unit, grams, nutrition, Yield ratio), not live links. A Recipe Entry carries `ingredients`
   (its breakdown for that portion), which `rescaleEntry` scales with it. Logging in g needs the weighed Prepared weight
   until ticket 18 estimates it; a fraction of the batch (unit `batch`) never does. The builder is a portal over Today.
+  Recipe Book (ticket 19, `shared/src/recipeBook.ts`): Recipes are in `useLibrary().items` with the Foods, so search, Quick Add
+  and stars cover both; Quick Add (or any unit a Recipe lacks) logs `QUICK_ADD_PORTION` (1/4 batch). `putRecipe` / `deleteRecipe`
+  mirror putFood/deleteFood (delete clears every Member's Favorite). A saved Recipe as an ingredient carries its own breakdown in
+  `ingredients` (Foods only); `checkRecipe` refuses a deeper breakdown and `nestingError` (API, Guest store) refuses pointing at a
+  Recipe that has one, a Recipe in itself, or giving a Recipe a Recipe while another uses it. Editing (builder given `recipe`,
+  opened from Profile > Library) rescales saved ingredient snapshots, never re-reading the Food.
 - **Two allowlists**: Cognito has no self sign-up, and the Lambda also refuses any username not in
   `ALLOWED_USERNAMES` (`USERNAMES` in `infra/lib/stacks.ts`), even with a valid token.
 - **Passkeys** (Cognito native, USER_AUTH): the relying party is `APP_DOMAIN`, so a passkey only

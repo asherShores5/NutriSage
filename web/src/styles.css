@@ -91,3 +91,6 @@ button.link { height: auto; padding: 0.35rem 0; border: 0; background: none; col
 }
 .tabbar button { height: var(--tabbar); border: 0; border-radius: 0; background: none; color: var(--muted); font-size: 0.85rem; }
 .tabbar button[aria-current="page"] { color: var(--accent); font-weight: 600; }
+
+/* "Recipe" beside a Library item's name (search matches, Quick Add, the builder, the Library screen). */
+.item-kind { color: var(--muted); font-size: 0.75em; font-weight: normal; }

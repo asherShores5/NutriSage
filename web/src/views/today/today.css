@@ -9,7 +9,10 @@
 .entry-form-actions .link { background: none; border: 0; padding: 0; height: auto; color: var(--accent); }
 .entry-form-known { margin: 0; font-size: 0.85rem; color: var(--muted, inherit); }
 .search-hits { list-style: none; margin: -0.2rem 0 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
-.search-hits li { padding: 0.6rem 0.75rem; cursor: pointer; }
+.search-hits li { padding: 0.6rem 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
+.search-hits .search-hit-name { flex: 1; min-width: 0; }
+/* The star sits in the row's padding so a starrable match is no taller than another. */
+.search-hits li .star { margin: -0.6rem -0.5rem -0.6rem 0; }
 .search-hits li + li { border-top: 1px solid var(--border); }
 .search-hits li[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .entry-grams { color: var(--muted); font-size: 0.85rem; margin-left: 0.4rem; }

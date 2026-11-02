@@ -24,8 +24,8 @@ export function EntryList({ date, entries, empty, onChange, onMove, onDelete }: 
 }) {
   const [open, setOpen] = useState<string>();
   const favorites = useFavorites();
-  const { foods } = useLibrary();
-  const inLibrary = new Set(foods.map((f) => f.id));
+  const { items } = useLibrary();
+  const inLibrary = new Set(items.map((f) => f.id));
   if (!entries.length) return <p className="empty">{empty}</p>;
   return (
     <section className="entry-list" aria-label="Entries">

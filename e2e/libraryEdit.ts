@@ -40,7 +40,7 @@ await c.check("aubyn edits it from Profile > Library: name, nutrition per servin
   const list = p.getByRole("list", { name: "Foods" });
   await expect(list.getByText("182 cal · 122 g serving")).toBeVisible();
   await shot(p, "library-edit-01-list");
-  await list.getByRole("button", { name: /2 eggs scrambled/ }).click();
+  await list.getByRole("button", { name: /^2 eggs scrambled/ }).click();
   const form = p.getByRole("form", { name: "Edit 2 eggs scrambled" });
   await expect(form.getByLabel("Calories")).toHaveValue("182");
   await expect(form.getByLabel("Unit name")).toHaveValue("egg");
@@ -85,7 +85,7 @@ await c.check("aubyn deletes it: gone from the Library and both Members' Favorit
   const p = await app.open("aubyn");
   c.watch(p);
   await openLibrary(p);
-  await p.getByRole("list", { name: "Foods" }).getByRole("button", { name: /Scrambled eggs/ }).click();
+  await p.getByRole("list", { name: "Foods" }).getByRole("button", { name: /^Scrambled eggs/ }).click();
   p.once("dialog", (d) => void d.accept());
   await p.getByRole("form", { name: "Edit Scrambled eggs" }).getByRole("button", { name: "Delete" }).click();
   await expect(p.getByText("The Library is empty. Foods join it when you estimate them.")).toBeVisible();
@@ -116,13 +116,13 @@ await c.check("a Guest edits and deletes Foods in their device Library, with no 
   await form.getByLabel("Name", { exact: true }).fill("Green apple");
   await form.getByRole("button", { name: "Save" }).click();
   await expect(list.getByText("Green apple")).toBeVisible();
-  await list.getByRole("button", { name: /Green apple/ }).click();
+  await list.getByRole("button", { name: /^Green apple/ }).click();
   p.once("dialog", (d) => void d.accept());
   await p.getByRole("form", { name: "Edit Green apple" }).getByRole("button", { name: "Delete" }).click();
   await expect(list.getByText("Green apple")).toHaveCount(0);
   await p.reload();
   await openLibrary(p);
-  await expect(p.getByRole("list", { name: "Foods" }).getByRole("button")).toHaveCount(7);
+  await expect(p.getByRole("list", { name: "Foods" }).getByRole("listitem")).toHaveCount(7);
   if (calls.length !== before) throw new Error("a Guest reached the Member API");
   await p.context().close();
 });

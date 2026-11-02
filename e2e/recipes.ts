@@ -68,7 +68,7 @@ await c.check("build a 3-ingredient Recipe with live totals, log 350 g, and expa
   if (saved?.input?.name !== "Chili" || saved.input.ingredients.length !== 3 || saved.input.preparedGrams !== 1200) throw new Error(`Recipe not saved: ${JSON.stringify(saved)}`);
   await expect.poll(() => (lastCall("putDay")?.args as any)?.input?.entries?.[0]).toMatchObject({ name: "Chili", amount: 350, unit: "g", grams: 350, libraryId: saved.id });
 
-  await entries.getByRole("button", { name: /Chili/ }).click();
+  await entries.getByRole("button", { name: /^Chili/ }).click();
   const breakdown = entries.getByRole("region", { name: "Ingredients of Chili" });
   await expect(breakdown.getByRole("listitem")).toHaveCount(3);
   await expect(breakdown.getByRole("listitem").nth(0)).toContainText("Ground beef");
@@ -79,7 +79,7 @@ await c.check("build a 3-ingredient Recipe with live totals, log 350 g, and expa
 
   // The breakdown survives a reload (it's part of the Day).
   await p.reload();
-  await p.getByRole("region", { name: "Entries" }).getByRole("button", { name: /Chili/ }).click();
+  await p.getByRole("region", { name: "Entries" }).getByRole("button", { name: /^Chili/ }).click();
   await expect(p.getByRole("region", { name: "Ingredients of Chili" }).getByRole("listitem")).toHaveCount(3);
   await p.context().close();
 });

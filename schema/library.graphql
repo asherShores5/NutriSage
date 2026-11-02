@@ -34,6 +34,19 @@ type RecipeIngredient {
   "Nutrition of that amount."
   nutrition: Nutrition!
   yieldRatio: Float
+  "Set when this ingredient is a portion of a saved Recipe (libraryId is its id): that portion's breakdown. Recipes nest one level deep, so these are Foods."
+  ingredients: [NestedIngredient!]
+}
+
+"One ingredient of a saved Recipe used inside another Recipe. Never a Recipe itself (one level deep)."
+type NestedIngredient {
+  libraryId: ID
+  name: String!
+  amount: Float!
+  unit: String!
+  grams: Float
+  nutrition: Nutrition!
+  yieldRatio: Float
 }
 
 "A Recipe in the Recipe Book: ingredients plus an optional weighed Prepared weight."
@@ -83,6 +96,18 @@ input RecipeIngredientInput {
   grams: Float
   nutrition: NutritionInput!
   yieldRatio: Float
+  "A portion of a saved Recipe: its breakdown (see RecipeIngredient.ingredients)."
+  ingredients: [NestedIngredientInput!]
+}
+
+input NestedIngredientInput {
+  libraryId: ID
+  name: String!
+  amount: Float!
+  unit: String!
+  grams: Float
+  nutrition: NutritionInput!
+  yieldRatio: Float
 }
 
 input RecipeInput {
@@ -94,6 +119,10 @@ input RecipeInput {
 extend type Mutation {
   "Save a new Recipe to the Recipe Book under a client-chosen id. Saving an id that's already there returns that Recipe unchanged."
   addRecipe(id: ID!, input: RecipeInput!): Recipe!
+  "Edit a saved Recipe (either Member may): ingredients, name, Prepared weight. Entries logged from it keep their own snapshot."
+  putRecipe(id: ID!, input: RecipeInput!): Recipe!
+  "Delete a saved Recipe and every Member's Favorite of it. Entries and other Recipes using it are untouched. Returns the id."
+  deleteRecipe(id: ID!): ID!
   "Edit a Library Food (either Member may). Entries logged from it keep their own snapshot."
   putFood(id: ID!, input: FoodEditInput!): Food!
   "Delete a Library Food and every Member's Favorite of it. Entries logged from it are untouched. Returns the id."
