@@ -3,6 +3,12 @@
 .trend-card { justify-items: stretch; }
 .trend-chart { width: 100%; height: auto; display: block; }
 .trend-axis { stroke: var(--border); stroke-width: 1; }
-.trend-line { fill: none; stroke: var(--bar); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.trend-line { fill: none; stroke: var(--bar); stroke-width: 2.5; stroke-linecap: round; }
+/* Bridged across no-data Days: dashed and lighter, so the gap stays visible. */
+.trend-bridge { stroke-dasharray: 2 7; stroke-width: 2; opacity: 0.6; }
+/* Today, in progress: a faded segment and a hollow dot. */
+.trend-line.trend-today { opacity: 0.45; }
 .trend-dot { fill: var(--bar); }
+.trend-dot.trend-today { fill: var(--surface); stroke: var(--bar); stroke-width: 2; }
 .trend-label { fill: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.trend-legend { margin: 0; }

@@ -17,6 +17,7 @@ Not a workspace, so CI never installs it.
     npx tsx offline.ts         # log offline, reload offline (service worker), sync back; phone -> desktop on focus
     npx tsx amounts.ts         # amounts (1 1/2, 1/3), unit picker, quick picks, rescaling in the editor
     npx tsx week.ts            # Week streak/averages/total vs seeded Days; Trends metric chart
+    npx tsx trends.ts          # Trends gaps: no data on unlogged Days, dashed bridges, today in progress
     npx tsx guest.ts           # Guest mode: demo data, capped estimates (cap 2 here), leave Guest mode
     npx tsx passkeys.ts        # add a passkey, sign in with it (virtual authenticator), password backup
     npx tsx mealWindows.ts     # Meal windows (faked clock): guess on open, a pick sticks, rollover, Profile edit
