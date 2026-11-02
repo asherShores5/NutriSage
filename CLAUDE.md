@@ -66,6 +66,11 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   hand-rolled service worker built by `vite.config.ts`.
 - `e2e/`: Playwright against an in-process fake backend (`backend.ts`: the real handler on
   `api/src/testing/fakeDynamo.ts`, fake Cognito), launcher `app.ts`, helpers `lib.ts`.
+- `api/src/migrate/`: the one-time migration from the old us-east-1 table (ticket 16). `migrate.ts` maps
+  old rows to v1 items (deterministic ids, create-only writes, so re-runs change nothing); `cli.ts` is the
+  script (dry run by default, `--apply` to write, target table from the `NutriSage` stack output). Tests in
+  `api/src/migrate.test.ts` run a fixture export through it and read back via the handler. Cutover steps
+  (Asher-only): `docs/cutover-runbook.md`; the old-Pages redirect page waits in `cutover/pages-redirect/`.
 - `docs/` (except `docs/specs/`) and `backend/`: the OLD live app (plain JS on GitHub Pages, Python
   Lambda in us-east-1). Leave them untouched until cutover (ticket 16); ticket 24 removes them.
 
