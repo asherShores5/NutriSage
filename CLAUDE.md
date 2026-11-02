@@ -66,6 +66,11 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
   hand-rolled service worker built by `vite.config.ts`.
 - `e2e/`: Playwright against an in-process fake backend (`backend.ts`: the real handler on
   `api/src/testing/fakeDynamo.ts`, fake Cognito), launcher `app.ts`, helpers `lib.ts`.
+- `api/src/migrate/`: the one-time migration from the old us-east-1 table (ticket 16). `migrate.ts` maps
+  old rows to v1 items (deterministic ids, create-only writes, so re-runs change nothing); `cli.ts` is the
+  script (dry run by default, `--apply` to write, target table from the `NutriSage` stack output). Tests in
+  `api/src/migrate.test.ts` run a fixture export through it and read back via the handler. Cutover steps
+  (Asher-only): `docs/cutover-runbook.md`; the old-Pages redirect page waits in `cutover/pages-redirect/`.
 - `docs/` (except `docs/specs/`) and `backend/`: the OLD live app (plain JS on GitHub Pages, Python
   Lambda in us-east-1). Leave them untouched until cutover (ticket 16); ticket 24 removes them.
 
@@ -74,6 +79,10 @@ Library, Favorite, Quick Add, Member, Guest) in code and UI.
 - **Data keys**: `MEMBER#<username>` / `DAY#YYYY-MM-DD` for a Member's Day; `HOUSEHOLD` for the
   shared Library. Partitions use the Cognito username (admin-created, allowlisted), not the sub.
   A Day write always carries the whole Day (Entries, water, weight): last write wins per Day.
+  Favorites are one row each at `MEMBER#<username>` / `FAV#<libraryId>` with `lastUsed`; a put never
+  moves `lastUsed` backwards (late outbox writes from another device). `deleteFood` clears an item from
+  every Member's Favorites in its transaction; Quick Add (`quickAdd` in shared) skips orphans anyway. Web: `library/useFavorites.ts` (`useFavorites`,
+  `useFavoriteIds` for search ranking, `noteLogged` after any add, `forgetFavorite` after a delete).
   Goals live at `MEMBER#<username>` / `GOALS` (0 = no goal; water defaults to 8 cups). Weight is > 0 or null
   (the old app's 0 meant not logged); water is whole cups.
 - **Recipes** (`shared/src/recipe.ts`, ticket 17): `HOUSEHOLD` / `RECIPE#<id>` beside `FOOD#<id>`; the id is chosen by the

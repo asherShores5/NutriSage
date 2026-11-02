@@ -29,7 +29,7 @@ await c.check("logs 1 1/2 servings, then editing it to 1/3 rescales the totals",
   await expect(form.getByLabel("Amount")).toHaveValue("1");
   await expect.poll(() => sentEntry()).toMatchObject({ amount: 1.5, unit: "serving", grams: 183 });
 
-  await entries.getByRole("button", { name: /2 eggs scrambled/ }).click();
+  await entries.getByRole("button", { name: /^2 eggs scrambled/ }).click();
   const editor = p.getByRole("group", { name: "Edit 2 eggs scrambled" });
   await expect(editor.getByLabel("Amount")).toHaveValue("1 1/2");
   await editor.getByLabel("Amount").fill("1/3");
@@ -39,7 +39,7 @@ await c.check("logs 1 1/2 servings, then editing it to 1/3 rescales the totals",
 
   await p.reload();
   await expect(calories(p)).toHaveText("61 cal");
-  await p.getByRole("region", { name: "Entries" }).getByRole("button", { name: /2 eggs scrambled/ }).click();
+  await p.getByRole("region", { name: "Entries" }).getByRole("button", { name: /^2 eggs scrambled/ }).click();
   await expect(p.getByRole("group", { name: "Edit 2 eggs scrambled" }).getByLabel("Amount")).toHaveValue("1/3");
   await p.context().close();
 });
@@ -65,7 +65,7 @@ await c.check("bad amounts show a message instead of resetting, and log or chang
   await expect(calories(p)).toHaveText("364 cal");
 
   const entries = p.getByRole("region", { name: "Entries" });
-  await entries.getByRole("button", { name: /Toast/ }).click();
+  await entries.getByRole("button", { name: /^Toast/ }).click();
   const editor = p.getByRole("group", { name: "Edit Toast" });
   await editor.getByLabel("Amount").fill("1 /");
   await expect(editor.getByRole("alert")).toHaveText("Type an amount like 0.4, 1/3 or 1 1/2");
@@ -81,7 +81,7 @@ await c.check("switching an Entry to g keeps the food, and the gram amount resca
   const p = await app.open("aubyn");
   c.watch(p);
   const entries = p.getByRole("region", { name: "Entries" });
-  await entries.getByRole("button", { name: /Toast/ }).click();
+  await entries.getByRole("button", { name: /^Toast/ }).click();
   const editor = p.getByRole("group", { name: "Edit Toast" });
   await editor.getByLabel("Unit").selectOption("g");
   await expect(editor.getByLabel("Amount")).toHaveValue("31");

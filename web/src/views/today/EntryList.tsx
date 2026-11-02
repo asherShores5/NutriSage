@@ -1,10 +1,16 @@
 import { useState } from "react";
 import { MEAL_LABELS, entriesByMeal, sumMacros, type Entry, type EntryMove } from "@nutrisage/shared";
+import { StarButton } from "../../components/StarButton";
+import { useFavorites } from "../../library/useFavorites";
+import { useLibrary } from "../../library/useLibrary";
 import { EntryEditor } from "./EntryEditor";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
-/** The Day's Entries grouped by Meal, in display order, each Meal with its calories. Tap an Entry to edit it. */
+/**
+ * The Day's Entries grouped by Meal, in display order, each Meal with its calories. Tap an Entry to
+ * edit it. An Entry logged from a Library item still in the Library has a star to make it a Favorite.
+ */
 export function EntryList({ date, entries, empty, onChange, onMove, onDelete }: {
   /** The Day shown (YYYY-MM-DD). */
   date: string;
@@ -17,6 +23,9 @@ export function EntryList({ date, entries, empty, onChange, onMove, onDelete }: 
   onDelete: (id: string) => void;
 }) {
   const [open, setOpen] = useState<string>();
+  const favorites = useFavorites();
+  const { foods } = useLibrary();
+  const inLibrary = new Set(foods.map((f) => f.id));
   if (!entries.length) return <p className="empty">{empty}</p>;
   return (
     <section className="entry-list" aria-label="Entries">
@@ -41,6 +50,9 @@ export function EntryList({ date, entries, empty, onChange, onMove, onDelete }: 
                   </span>
                   <span className="entry-cal">{Math.round(e.nutrition.calories)} cal</span>
                 </button>
+                {favorites.loaded && e.libraryId && inLibrary.has(e.libraryId) && (
+                  <StarButton name={e.name} starred={favorites.isFavorite(e.libraryId)} onToggle={() => favorites.toggle(e.libraryId!)} />
+                )}
                 {open === e.id && (
                   <EntryEditor
                     entry={e}

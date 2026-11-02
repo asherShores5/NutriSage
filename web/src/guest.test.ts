@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dateKey } from "@nutrisage/shared";
+import { dateKey, foodEdit } from "@nutrisage/shared";
 
 // Guest mode at the data/session layer: the same api/days and api/estimate functions Today uses,
 // answered from browser storage (Days) and the Guest estimate endpoint (estimates) for a Guest.
@@ -37,6 +37,7 @@ async function launch() {
     library: await import("./api/library"),
     recipes: await import("./api/recipes"),
     store: await import("./guest/store"),
+    favorites: await import("./api/favorites"),
   };
 }
 
@@ -97,6 +98,43 @@ describe("a Guest", () => {
     const again = await launch();
     expect((await again.goals.getGoals()).calories).toBe(1800);
     expect(requests).toEqual([]);
+  });
+
+  it("keeps Favorites on this device only: star, bump, unstar, across a relaunch", async () => {
+    const { session, favorites, library } = await launch();
+    session.enterGuest();
+    const [a, b] = await library.getLibrary();
+    expect(await favorites.getFavorites()).toEqual([]);
+    await favorites.putFavorite({ libraryId: a.id, lastUsed: 100 });
+    await favorites.putFavorite({ libraryId: b.id, lastUsed: 200 });
+    // An older bump never moves lastUsed backwards, like the Member API.
+    expect(await favorites.putFavorite({ libraryId: b.id, lastUsed: 150 })).toEqual({ libraryId: b.id, lastUsed: 200 });
+    const again = await launch();
+    expect(await again.favorites.getFavorites()).toEqual([{ libraryId: a.id, lastUsed: 100 }, { libraryId: b.id, lastUsed: 200 }]);
+    await again.favorites.deleteFavorite(a.id);
+    expect(await again.favorites.getFavorites()).toEqual([{ libraryId: b.id, lastUsed: 200 }]);
+    expect(requests).toEqual([]);
+  });
+
+  it("keeps Favorites through every other Guest write (Days, goals, a new Food)", async () => {
+    const { session, favorites, library, days, goals } = await launch();
+    session.enterGuest();
+    const [a] = await library.getLibrary();
+    await favorites.putFavorite({ libraryId: a.id, lastUsed: 100 });
+    await days.putDay({ date: today, entries: [] });
+    await goals.putGoals({ ...(await goals.getGoals()), calories: 1900 });
+    await library.putFood(a.id, { ...foodEdit(a), name: `${a.name} (edited)` });
+    expect(await favorites.getFavorites()).toEqual([{ libraryId: a.id, lastUsed: 100 }]);
+  });
+
+  it("deleting a Food from the device Library also drops its Favorite", async () => {
+    const { session, favorites, library } = await launch();
+    session.enterGuest();
+    const [a, b] = await library.getLibrary();
+    await favorites.putFavorite({ libraryId: a.id, lastUsed: 100 });
+    await favorites.putFavorite({ libraryId: b.id, lastUsed: 200 });
+    await library.deleteFood(a.id);
+    expect(await favorites.getFavorites()).toEqual([{ libraryId: b.id, lastUsed: 200 }]);
   });
 
   it("estimates through the Guest endpoint, never the Member API", async () => {

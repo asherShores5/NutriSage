@@ -51,3 +51,16 @@ button.danger { color: var(--danger); border-color: var(--danger); background: n
 .entry-move label { display: grid; gap: 0.2rem; font-size: 0.8rem; color: var(--muted); }
 .entry-move select, .entry-move input { width: 100%; }
 .clear-day { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+
+/* Quick Add (ticket 14): starred Library items, most recently used first, in one scrolling row. */
+.quick-add { margin: 0 0 0.75rem; }
+.quick-add-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.4rem; }
+.quick-add-head h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0; }
+.quick-add-meal, .quick-add-empty { color: var(--muted); font-size: 0.8rem; }
+.quick-add-empty { margin: 0; }
+.quick-add ul { list-style: none; margin: 0; padding: 0 0 0.25rem; display: flex; gap: 0.4rem; overflow-x: auto; scrollbar-width: thin; }
+.quick-add-item { white-space: nowrap; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; border-radius: 999px; padding: 0 0.9rem; background: var(--surface); }
+.entry { display: flex; align-items: flex-start; flex-wrap: wrap; }
+.entry > .entry-row { flex: 1 1 0; min-width: 0; }
+.entry > .star { margin: 0.3rem 0.25rem 0 0; }
+.entry > .entry-editor { flex: 1 0 100%; }

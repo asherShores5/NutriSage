@@ -1,2 +1,26 @@
 # Favorites and Quick Add (ticket 14). Resolvers: api/src/resolvers/favorites.ts.
-# Placeholder: add types here and fields with `extend type Query { ... }` / `extend type Mutation { ... }`.
+# Per Member (MEMBER#<username> / FAV#<libraryId>); Guests keep theirs on the device.
+
+"One Member's star on a Library item (Food or Recipe)."
+type Favorite {
+  libraryId: ID!
+  "Epoch ms the Member last logged it (or starred it). Quick Add shows newest first."
+  lastUsed: Float!
+}
+
+input FavoriteInput {
+  libraryId: ID!
+  lastUsed: Float!
+}
+
+extend type Query {
+  "The caller's Favorites."
+  favorites: [Favorite!]!
+}
+
+extend type Mutation {
+  "Star a Library item, or record a newer last-used time (an older one keeps the stored, newer time)."
+  putFavorite(input: FavoriteInput!): Favorite!
+  "Unstar a Library item. Returns its id."
+  deleteFavorite(libraryId: ID!): ID!
+}

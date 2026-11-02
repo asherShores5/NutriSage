@@ -15,7 +15,7 @@ function fakeServer() {
       if (!s.online) throw new NetworkError("offline");
       if (s.reject) throw new Error(s.reject);
       s.received.push(op);
-      return op.type === "putDay" ? op.day : op.goals;
+      return op;
     },
   };
   return s;
@@ -105,5 +105,20 @@ describe("outbox", () => {
     server.online = true;
     await outbox.flush();
     expect(reach).toEqual([false, true]);
+  });
+
+  it("queues Favorites per Library item: a star then unstar of one item sends only the unstar, other items keep theirs", async () => {
+    const server = fakeServer();
+    const outbox = createOutbox({ ...memoryStorage(), send: server.send });
+    await outbox.enqueue({ type: "putFavorite", favorite: { libraryId: "eggs", lastUsed: 1 } });
+    await outbox.enqueue({ type: "putFavorite", favorite: { libraryId: "oats", lastUsed: 2 } });
+    await outbox.enqueue({ type: "deleteFavorite", libraryId: "eggs" });
+    expect(outbox.pendingFor("FAV#eggs")).toMatchObject({ type: "deleteFavorite" });
+    server.online = true;
+    await outbox.flush();
+    expect(server.received.map(({ id: _id, ...o }) => o)).toEqual([
+      { type: "putFavorite", favorite: { libraryId: "oats", lastUsed: 2 } },
+      { type: "deleteFavorite", libraryId: "eggs" },
+    ]);
   });
 });

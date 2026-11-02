@@ -11,7 +11,7 @@ import {
 } from "@nutrisage/shared";
 import { UserError, invalid } from "../errors";
 import type { Estimate } from "../estimate";
-import { HOUSEHOLD_PK, TABLE, ddb, foodKey, memberPk, recipeKey, strip } from "../table";
+import { HOUSEHOLD_PK, TABLE, ddb, favoriteKey, foodKey, memberPk, recipeKey, strip } from "../table";
 import type { ResolverModule } from "./types";
 
 /** Record cap against a scripted flood; far above what a household logs. Mutable for tests only. */
@@ -141,8 +141,6 @@ async function putFood(id: string, input: unknown): Promise<Food> {
   return food;
 }
 
-/** A Member's Favorite of a Library item: MEMBER#<username> / FAV#<libraryId> (ticket 14 stores them). */
-const favoriteSk = (libraryId: string) => `FAV#${libraryId}`;
 
 /** Every Member's username (the handler's allowlist), read per call so tests can set it. */
 const members = () => (process.env.ALLOWED_USERNAMES ?? "").split(",").filter(Boolean);
@@ -156,7 +154,7 @@ async function deleteFood(id: string): Promise<string> {
   const del = (PK: string, SK: string) => ({ Delete: { TableName: TABLE, Key: { PK, SK } } });
   await ddb().send(
     new TransactWriteCommand({
-      TransactItems: [...members().map((u) => del(memberPk(u), favoriteSk(id))), del(HOUSEHOLD_PK, foodKey(id))],
+      TransactItems: [...members().map((u) => del(memberPk(u), favoriteKey(id))), del(HOUSEHOLD_PK, foodKey(id))],
     }),
   );
   return id;

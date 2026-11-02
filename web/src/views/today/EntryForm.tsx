@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { MEALS, MEAL_LABELS, NUTRIENTS, SERVING, logFood, parseAmount, searchLibrary, type Entry, type Food, type Meal } from "@nutrisage/shared";
 import { estimate } from "../../api/estimate";
 import { AmountPicker } from "../../components/AmountPicker";
+import { useFavoriteIds } from "../../library/useFavorites";
 import { rememberFood, useLibrary } from "../../library/useLibrary";
 import { RecipeBuilder } from "./RecipeBuilder";
 import { useMealPick } from "./useMealPick";
@@ -31,8 +32,9 @@ export function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void
   const [error, setError] = useState<string>();
   const [building, setBuilding] = useState(false);
   const { foods } = useLibrary();
-  // Ticket 14 passes the Member's Favorite ids here ({ favoriteIds }) so they rank first.
-  const hits = useMemo(() => (byHand ? [] : searchLibrary(foods, name)), [foods, name, byHand]);
+  // The Member's Favorites rank first among the matches.
+  const favoriteIds = useFavoriteIds();
+  const hits = useMemo(() => (byHand ? [] : searchLibrary(foods, name, { favoriteIds })), [foods, name, byHand, favoriteIds]);
   /** A match chosen with the arrow keys (null: none, by Escape), only for the text it was chosen on. */
   const [cursor, setCursor] = useState<{ name: string; id: string | null }>();
   const pickedId = cursor?.name === name ? cursor.id : (hits.find((h) => h.whole)?.item.id ?? null);
