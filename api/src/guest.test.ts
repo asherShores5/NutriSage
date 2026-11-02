@@ -19,7 +19,7 @@ describe("Guest estimate", () => {
   it("estimates a Food with no sign-in, through the same estimate core as Members", async () => {
     const r = await g.post({ text: "2 eggs scrambled" });
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ name: "2 eggs scrambled", nutrition: EGGS_NUTRITION, servingGrams: 122, yieldRatio: null });
+    expect(r.body).toEqual({ name: "2 eggs scrambled", nutrition: EGGS_NUTRITION, servingGrams: 122, yieldRatio: null, units: [] });
     expect(h.bedrock.lastPrompt()).toContain("2 eggs scrambled");
   });
 });

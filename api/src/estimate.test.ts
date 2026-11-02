@@ -11,9 +11,16 @@ describe("estimate (a Member types a Food and Bedrock estimates it)", () => {
   it("returns all 7 nutrients for the named serving plus the serving's gram weight", async () => {
     h.bedrock.reply(JSON.stringify({ ...EGGS, servingGrams: 122 }));
     const r = await h.call(h.A, "estimate", { text: "2 eggs scrambled" });
-    expect(r).toEqual({ name: "2 eggs scrambled", nutrition: EGGS, servingGrams: 122, yieldRatio: null });
+    expect(r).toMatchObject({ name: "2 eggs scrambled", nutrition: EGGS, servingGrams: 122, yieldRatio: null, units: [] });
     expect(h.bedrock.lastPrompt()).toContain("2 eggs scrambled");
     expect(h.bedrock.calls[0].modelId).toBe("test-model");
+  });
+
+  it("returns other units Bedrock suggests with their gram weights, dropping junk ones", async () => {
+    h.bedrock.reply(JSON.stringify({ ...EGGS, servingGrams: 122, units: { Egg: 61, cup: "240 g", serving: 5, g: 2, "": 4, slice: -3, scoop: "lots" } }));
+    const r = await h.call(h.A, "estimate", { text: "2 eggs scrambled" });
+    expect(r.units).toEqual([{ label: "egg", grams: 61 }, { label: "cup", grams: 240 }]);
+    expect(h.bedrock.calls[0].system?.map((b) => ("text" in b ? b.text : "")).join("")).toContain("units");
   });
 
   it("reads a reply wrapped in a code fence or prose, and rounds to 0.1", async () => {

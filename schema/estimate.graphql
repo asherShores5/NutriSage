@@ -10,9 +10,13 @@ type Estimate {
   servingGrams: Float
   "Raw-to-prepared weight ratio; only when asked with ingredient: true."
   yieldRatio: Float
+  "Other common units Bedrock suggests (egg, cup, slice...) with the gram weight of one. May be empty."
+  units: [FoodUnit!]!
+  "The Library Food this was saved as (or the existing one with the same name). Null for an all-zero estimate or a full Library, and always from the Guest endpoint."
+  food: Food
 }
 
 extend type Mutation {
-  "Estimate one serving of `text` (e.g. \"2 eggs scrambled\"). Set ingredient for a Recipe ingredient's Yield ratio."
+  "Estimate one serving of `text` (e.g. \"2 eggs scrambled\") and save it to the shared Library. Set ingredient for a Recipe ingredient's Yield ratio."
   estimate(text: String!, ingredient: Boolean): Estimate!
 }
