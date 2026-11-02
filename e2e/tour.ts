@@ -31,6 +31,14 @@ async function sweep(p: Page, name: string) {
   await p.getByLabel("Metric").selectOption("weight");
   await p.waitForTimeout(200);
   await shot(p, `tour-${name}-03b-trends-weight-gaps`);
+  // Y-axis modes and the goal line (calories: goal 2000 from seed()).
+  await p.getByLabel("Metric").selectOption("calories");
+  await p.getByLabel("Y-axis scale").selectOption("fit");
+  await shot(p, `tour-${name}-03c-trends-fit-goal`);
+  await p.getByLabel("Y-axis scale").selectOption("manual");
+  await p.getByLabel("Y-axis min").fill("1800");
+  await p.getByLabel("Y-axis max").fill("2200");
+  await shot(p, `tour-${name}-03d-trends-manual`);
   // Today's form switched to typing nutrition by hand.
   await tab(p, "Today");
   await p.getByRole("button", { name: "Type nutrition by hand" }).click();
