@@ -1,7 +1,7 @@
 // Visual sweep: the sign-in screen and every tab on phone, desktop, and phone in dark theme.
 // Screenshots in $OUT/tour-* (see lib.ts). Look at them; DOM checks miss layout bugs.
 import type { Page } from "playwright";
-import { launch, todayKey } from "./app";
+import { cspViolations, launch, todayKey } from "./app";
 import { db, graphql, seed, seedLibrary } from "./backend";
 import { lastDays } from "../shared/src/week";
 import { OUT, shot, tab } from "./lib";
@@ -88,3 +88,7 @@ await out.getByRole("button", { name: "Sign in with passkey" }).waitFor();
 await shot(out, "tour-phone-00-login");
 await app.close();
 console.log(`screenshots in ${OUT}/tour-*.png`);
+if (cspViolations.length) {
+  console.log(`FAIL  Content-Security-Policy violations:\n      ${[...new Set(cspViolations)].join("\n      ")}`);
+  process.exitCode = 1;
+}

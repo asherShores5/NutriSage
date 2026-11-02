@@ -1,5 +1,7 @@
 // Opens the built web app (web/dist) in headless Chromium with every network call routed to
-// the fake backend. Build first: npm run build:web (from the repo root).
+// the fake backend. Build first: npm run build:web (from the repo root). The app is served with the
+// same Content-Security-Policy CloudFront sends (infra/lib/csp.ts, for these fake hosts), and any
+// violation fails the run (lib.ts checklist), so a change the CSP would block shows up here.
 //
 //   const app = await launch();
 //   const asher = await app.open("asher");                 // signed in, Today loaded
@@ -9,6 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, devices, type Browser, type BrowserContext, type Page } from "playwright";
+import { contentSecurityPolicy } from "../infra/lib/csp";
 import { cognito, graphql, guestRequest } from "./backend";
 
 export const ORIGIN = "https://nutrisage.test";
@@ -16,6 +19,12 @@ const GRAPHQL_URL = "https://e2e.appsync-api.us-west-1.amazonaws.com/graphql";
 const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "web", "dist");
 
 const GUEST_URL = "https://e2e-guest.execute-api.us-west-1.amazonaws.com";
+
+/** The deployed policy (hosting.ts) for the fake hosts. */
+export const CSP = contentSecurityPolicy({ region: "us-west-1", graphqlHost: new URL(GRAPHQL_URL).host, guestHost: new URL(GUEST_URL).host });
+
+/** Content-Security-Policy violations seen by any page (lib.ts fails the checklist on any). */
+export const cspViolations: string[] = [];
 
 const CONFIG = { region: "us-west-1", userPoolId: "us-west-1_e2e", clientId: "e2e-client", graphqlUrl: GRAPHQL_URL, guestEstimateUrl: GUEST_URL };
 
@@ -61,7 +70,13 @@ export async function launch() {
       });
     }
     page.on("pageerror", (e) => console.log(`[${username}] pageerror: ${e.message}`));
-    page.on("console", (m) => { if (m.type() === "error") console.log(`[${username}] console: ${m.text()}`); });
+    page.on("console", (m) => {
+      if (m.text().startsWith("CSP violation:")) cspViolations.push(`[${username}] ${m.text()}`);
+      if (m.type() === "error") console.log(`[${username}] console: ${m.text()}`);
+    });
+    await context.addInitScript(() => {
+      document.addEventListener("securitypolicyviolation", (e) => console.error(`CSP violation: ${e.violatedDirective} blocked ${e.blockedURI || "inline"}`));
+    });
 
     if (!opts.signedOut) {
       await context.addInitScript((u) => {
@@ -78,7 +93,11 @@ export async function launch() {
       if (url.pathname === "/config.json") return route.fulfill({ json: CONFIG });
       let file = path.join(DIST, decodeURIComponent(url.pathname));
       if (!file.startsWith(DIST) || !existsSync(file) || url.pathname === "/") file = path.join(DIST, "index.html");
-      return route.fulfill({ body: readFileSync(file), contentType: TYPES[path.extname(file)] ?? "application/octet-stream" });
+      return route.fulfill({
+        body: readFileSync(file),
+        contentType: TYPES[path.extname(file)] ?? "application/octet-stream",
+        headers: { "content-security-policy": CSP },
+      });
     });
     await context.route("https://cognito-idp.us-west-1.amazonaws.com/", async (route) => {
       const target = (route.request().headers()["x-amz-target"] ?? "").split(".").pop()!;

@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "playwright";
+import { cspViolations } from "./app";
 import { calls } from "./backend";
 
 /** Screenshots go to /tmp/e2e-nutrisage-<checkout folder>, so parallel worktrees don't overwrite each other. */
@@ -26,6 +27,8 @@ export function checklist(prefix: string) {
     },
     /** Print results; exits non-zero if any check failed. */
     report() {
+      // Every page is served with the deployed CSP (app.ts): anything it blocked fails the run.
+      if (cspViolations.length) results.push(["no Content-Security-Policy violations", false, [...new Set(cspViolations)].join("; ")]);
       for (const [n, ok, d] of results) console.log(`${ok ? "PASS" : "FAIL"}  ${n}${d ? `\n      ${d}` : ""}`);
       const failed = results.filter((r) => !r[1]).length;
       console.log(`\n${results.length - failed}/${results.length} passed`);
