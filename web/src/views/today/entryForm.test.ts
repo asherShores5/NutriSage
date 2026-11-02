@@ -73,13 +73,13 @@ describe("entryFromEstimate, once the estimate is saved to the Library", () => {
 describe("formUnits (what the unit picker offers)", () => {
   const library = [food("Eggs", 120, [{ label: "egg", grams: 60 }]), food("Mystery stew", null)];
 
-  it("offers a Library Food's own units when the typed name is that Food", () => {
-    expect(formUnits(library, " eggs ", false)).toEqual(["serving", "g", "egg"]);
-    expect(formUnits(library, "mystery STEW", false)).toEqual(["serving"]);
+  it("offers the picked Library Food's own units", () => {
+    expect(formUnits(library[0], false)).toEqual(["serving", "g", "egg"]);
+    expect(formUnits(library[1], false)).toEqual(["serving"]);
   });
 
   it("offers serving and g for a new Food, and only serving when typing nutrition by hand", () => {
-    expect(formUnits(library, "pancakes", false)).toEqual(["serving", "g"]);
-    expect(formUnits(library, "eggs", true)).toEqual(["serving"]);
+    expect(formUnits(undefined, false)).toEqual(["serving", "g"]);
+    expect(formUnits(library[0], true)).toEqual(["serving"]);
   });
 });
