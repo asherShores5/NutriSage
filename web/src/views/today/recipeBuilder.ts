@@ -1,8 +1,9 @@
 // The Recipe builder's rules (ticket 17), kept pure so they're testable without a DOM. The Recipe
 // math itself (totals, raw weight, portions) is in shared/src/recipe.ts.
 import {
-  BATCH, checkRecipe, foodFromServing, formatAmount, ingredientFromFood, ingredientFromRecipe, ingredientUnits, logRecipe, parseAmount,
-  recipeUnits, rescaleIngredient, type Entry, type Food, type Meal, type NewRecipe, type Recipe, type RecipeIngredient,
+  BATCH, YIELD_MAX, checkRecipe, foodFromServing, formatAmount, ingredientFromFood, ingredientFromRecipe, ingredientUnits, isWeighed, logRecipe,
+  parseAmount, recipeUnits, rescaleIngredient,
+  type Entry, type Food, type Meal, type NewRecipe, type PreparedWeightSource, type Recipe, type RecipeIngredient,
 } from "@nutrisage/shared";
 import type { Estimate } from "../../api/estimate";
 
@@ -70,6 +71,32 @@ export function readPrepared(text: string): { ok: true; grams: number | null } |
   if (!Number.isFinite(g) || g <= 0) return { ok: false, error: "Prepared weight must be a number of grams, more than 0" };
   return { ok: true, grams: g };
 }
+
+/** What the builder says under the Prepared weight: weighed, estimated (and how much), or what's missing. */
+export function preparedNote(weight: { grams: number; source: PreparedWeightSource } | null): string {
+  if (!weight) return "Not known (an ingredient has no gram weight): weigh the batch to log in g, or log a fraction of it";
+  if (weight.source === "weighed") return "Weighed";
+  return `Estimated ${Math.round(weight.grams)} g from Yield ratios. Weigh the batch for exact portions.`;
+}
+
+/** A typed Yield ratio: blank is unknown (counted as 1), else a number more than 0 and at most YIELD_MAX. */
+export function readYieldRatio(text: string): { ok: true; ratio: number | null } | { ok: false; error: string } {
+  const t = text.trim().replace(",", ".");
+  if (!t) return { ok: true, ratio: null };
+  const y = Number(t);
+  if (!Number.isFinite(y) || y <= 0 || y > YIELD_MAX) return { ok: false, error: `Yield ratio must be more than 0 and at most ${YIELD_MAX}` };
+  return { ok: true, ratio: y };
+}
+
+/** `food` with Yield ratio `ratio` (none when null). */
+export function withYieldRatio(food: Food, ratio: number | null): Food {
+  const { yieldRatio: _old, ...rest } = food;
+  return ratio ? { ...rest, yieldRatio: ratio } : rest;
+}
+
+/** Whether to ask Bedrock for a Yield ratio: a Library Food with none whose gram weight is known (else there's no estimate to make). */
+export const needsYieldSuggestion = (food: Food): boolean =>
+  !!food.id && !(typeof food.yieldRatio === "number" && food.yieldRatio > 0) && isWeighed(food);
 
 /** The Food an ingredient estimate gives: the Library's, or (when it wasn't saved) one with no id. */
 export function foodFromEstimate(est: Estimate): Food {

@@ -29,6 +29,8 @@ const chili = (preparedGrams: number | null = 1200): NewRecipe => ({
   ingredients: [ing(BEEF, 500, "g"), ing(BEANS, 1, "can"), ing(TOMATO, 2, "cup")],
   preparedGrams,
 });
+/** Not weighed, and the spice mix has no gram weight: no Prepared weight at all. */
+const unweighable = (): NewRecipe => ({ ...chili(null), ingredients: [...chili().ingredients, ing(MYSTERY, 1, "serving")] });
 
 describe("ingredients", () => {
   it("snapshot the amount, grams and nutrition of what went in, and point at the Food", () => {
@@ -75,8 +77,23 @@ describe("Prepared weight", () => {
     expect(preparedWeight(chili(1200))).toEqual({ grams: 1200, source: "weighed" });
   });
 
-  it("is unknown when not weighed (Yield-ratio estimates come with ticket 18)", () => {
-    expect(preparedWeight(chili(null))).toBeNull();
+  it("the weighed value wins over the Yield-ratio estimate", () => {
+    expect(preparedWeight(chili(900))).toEqual({ grams: 900, source: "weighed" });
+  });
+
+  it("is estimated from Yield ratios when not weighed: each ingredient's grams x its ratio, 1 when unknown", () => {
+    // beef 500 g x 0.75 + beans 400 g x 1 + tomatoes 480 g x 1
+    expect(preparedWeight(chili(null))).toEqual({ grams: 1255, source: "estimated" });
+  });
+
+  it("a ratio above 1 grows the estimate (dry rice soaks up water)", () => {
+    const RICE = food("rice", "Dry rice", { calories: 3.6 }, [["serving", 45], ["g", 1]], 2.5);
+    expect(preparedWeight({ ingredients: [ing(RICE, 200, "g"), ing(BEANS, 1, "can")], preparedGrams: null })).toEqual({ grams: 900, source: "estimated" });
+  });
+
+  it("is unknown when not weighed and an ingredient's grams are unknown", () => {
+    expect(preparedWeight(unweighable())).toBeNull();
+    expect(preparedWeight({ ingredients: [], preparedGrams: null })).toBeNull();
   });
 });
 
@@ -98,8 +115,15 @@ describe("logging a portion", () => {
     expect(r.entry.ingredients?.[2]).toMatchObject({ amount: 0.5, unit: "cup" });
   });
 
-  it("by grams needs a Prepared weight", () => {
-    expect(logRecipe(chili(null), { amount: 350, unit: "g" }, "dinner")).toEqual({
+  it("by grams works on an estimated Prepared weight", () => {
+    const r = logRecipe(chili(null), { amount: 251, unit: "g" }, "dinner"); // a fifth of the 1255 g estimate
+    if (!r.ok) throw new Error(r.error);
+    expect(r.entry).toMatchObject({ amount: 251, unit: "g", grams: 251 });
+    expect(r.entry.nutrition.calories).toBeCloseTo(341.2); // 1706 / 5
+  });
+
+  it("by grams needs a Prepared weight, weighed or estimated", () => {
+    expect(logRecipe(unweighable(), { amount: 350, unit: "g" }, "dinner")).toEqual({
       ok: false, error: "Enter the Prepared weight (weigh the finished batch) to log Chili in g",
     });
   });
@@ -112,11 +136,11 @@ describe("logging a portion", () => {
   });
 
   it("by fraction works without a Prepared weight (no grams then)", () => {
-    const r = logRecipe(chili(null), { amount: 0.5, unit: BATCH }, "lunch");
+    const r = logRecipe(unweighable(), { amount: 0.5, unit: BATCH }, "lunch");
     if (!r.ok) throw new Error(r.error);
     expect(r.entry.grams).toBeUndefined();
-    expect(r.entry.nutrition.calories).toBeCloseTo(853);
-    expect(r.entry.ingredients).toHaveLength(3);
+    expect(r.entry.nutrition.calories).toBeCloseTo(903); // (1706 + 100) / 2
+    expect(r.entry.ingredients).toHaveLength(4);
   });
 
   it("an unsaved Recipe's Entry points at nothing", () => {

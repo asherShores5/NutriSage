@@ -18,10 +18,13 @@ const builder = (p: Page) => p.getByRole("dialog", { name: "Recipe builder" });
 /** Add a Library Food or estimate a new one, then set its amount and unit. */
 async function addIngredient(p: Page, text: string, amount: string, unit: string) {
   const b = builder(p);
+  const rows = b.getByRole("list", { name: "Ingredients" }).locator(":scope > li");
+  const before = await rows.count();
   await b.getByLabel("Ingredient", { exact: true }).fill(text);
   await b.getByLabel("Ingredient", { exact: true }).press("Enter");
-  const row = b.getByRole("list", { name: "Ingredients" }).locator(":scope > li").last();
-  await expect(row).toBeVisible();
+  // Wait for the new row (an estimate takes a moment), else the amount lands on the previous one.
+  await expect(rows).toHaveCount(before + 1);
+  const row = rows.last();
   await row.getByLabel("Unit").selectOption(unit);
   await row.getByLabel("Amount").fill(amount);
 }
@@ -46,13 +49,13 @@ await c.check("build a 3-ingredient Recipe with live totals, log 350 g, and expa
   await expect(total).toContainText("1706 cal"); // 1250 + 360 + 96
   await expect(total).toContainText("Raw weight 1380 g");
 
-  // Without a Prepared weight, grams can't be logged yet.
+  // Unweighed, the Prepared weight is estimated from Yield ratios (ticket 18; none known here, so x1).
+  await expect(b.locator(".prepared-note")).toContainText("Estimated 1380 g");
   await b.getByRole("group", { name: "Portion" }).getByLabel("Unit").selectOption("g");
   await b.getByRole("group", { name: "Portion" }).getByLabel("Amount").fill("350");
-  await b.getByRole("button", { name: "Log Recipe" }).click();
-  await expect(b.getByRole("alert")).toContainText("Prepared weight");
 
   await b.getByLabel("Prepared weight").fill("1200");
+  await expect(b.locator(".prepared-note")).toHaveText("Weighed");
   await expect(b.getByRole("status", { name: "This portion" })).toContainText("498 cal"); // 1706 x 350 / 1200
   await expect(b.getByLabel("Save to Recipe Book")).toBeChecked();
   await b.screenshot({ path: `${OUT}/recipe-builder.png` });
@@ -84,7 +87,7 @@ await c.check("build a 3-ingredient Recipe with live totals, log 350 g, and expa
   await p.context().close();
 });
 
-await c.check("log a fraction of the batch without a Prepared weight, without saving", async () => {
+await c.check("log a fraction of the unweighed batch, without saving", async () => {
   const p = await app.open("aubyn");
   c.watch(p);
   const saves = calls.filter((x) => x.field === "addRecipe").length;
@@ -100,7 +103,8 @@ await c.check("log a fraction of the batch without a Prepared weight, without sa
   await expect(p.getByRole("region", { name: "Entries" }).getByText("Bean bowl")).toBeVisible();
   if (calls.filter((x) => x.field === "addRecipe").length !== saves) throw new Error("an unsaved Recipe was saved");
   const entry = (lastCall("putDay")?.args as any)?.input?.entries?.[0];
-  if (entry?.unit !== "batch" || entry.amount !== 0.25 || entry.libraryId || entry.grams) throw new Error(`bad Entry: ${JSON.stringify(entry)}`);
+  // 1/4 of the 400 g estimate (beans have no Yield ratio: x1).
+  if (entry?.unit !== "batch" || entry.amount !== 0.25 || entry.libraryId || entry.grams !== 100) throw new Error(`bad Entry: ${JSON.stringify(entry)}`);
   await p.context().close();
 });
 

@@ -34,6 +34,12 @@ const BURRITO: Recipe = {
   id: "burrito", name: "Burrito", ingredients: [ing(TORTILLA, 1, "serving"), nested(CHILI, 300, "g")], preparedGrams: null, createdBy: "aubyn", updatedAt: 2,
 };
 
+// Not weighed, and a spice of unknown weight: no Prepared weight at all, not even a Yield-ratio estimate.
+const SPICED: Recipe = {
+  ...CHILI, id: "spiced", name: "Spiced beans", preparedGrams: null,
+  ingredients: [ing(BEANS, 1, "can"), { libraryId: null, name: "Spice mix", amount: 1, unit: "serving", nutrition: per({ calories: 10 }) }],
+};
+
 describe("a saved Recipe as an ingredient", () => {
   it("is a portion of it (g or a fraction of the batch) pointing at the Recipe, with its own breakdown", () => {
     const x = nested(CHILI, 300, "g");
@@ -57,8 +63,9 @@ describe("a saved Recipe as an ingredient", () => {
     });
   });
 
-  it("logs in g only when the Recipe has a Prepared weight", () => {
-    expect(ingredientFromRecipe({ ...CHILI, preparedGrams: null }, { amount: 300, unit: "g" })).toMatchObject({ ok: false, error: expect.stringContaining("Prepared weight") });
+  it("logs in g only when the Recipe has a Prepared weight (weighed or estimated)", () => {
+    expect(ingredientFromRecipe({ ...CHILI, preparedGrams: null }, { amount: 300, unit: "g" })).toMatchObject({ ok: true, ingredient: { grams: 300 } });
+    expect(ingredientFromRecipe(SPICED, { amount: 300, unit: "g" })).toMatchObject({ ok: false, error: expect.stringContaining("Prepared weight") });
   });
 });
 
@@ -110,13 +117,14 @@ describe("Recipes in the add box and Quick Add", () => {
 
   it("logs in a fraction of the batch, or g when the Prepared weight is known", () => {
     expect(recipeUnits(CHILI)).toEqual(["batch", "g"]);
-    expect(recipeUnits(BURRITO)).toEqual(["batch"]);
+    expect(recipeUnits(BURRITO)).toEqual(["batch", "g"]); // estimated: 60 g tortilla + 300 g Chili
+    expect(recipeUnits(SPICED)).toEqual(["batch"]);
   });
 
   it("Quick Add (and any unit a Recipe hasn't got) logs 1/4 of the batch", () => {
     expect(QUICK_ADD_PORTION).toEqual({ amount: 0.25, unit: "batch" });
     expect(recipePortion(CHILI, { amount: 1, unit: "serving" })).toEqual(QUICK_ADD_PORTION);
-    expect(recipePortion(BURRITO, { amount: 200, unit: "g" })).toEqual(QUICK_ADD_PORTION);
+    expect(recipePortion(SPICED, { amount: 200, unit: "g" })).toEqual(QUICK_ADD_PORTION);
     expect(recipePortion(CHILI, { amount: 200, unit: "g" })).toEqual({ amount: 200, unit: "g" });
   });
 

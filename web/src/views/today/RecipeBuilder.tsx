@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  BATCH, MEALS, MEAL_LABELS, QUICK_ADD_PORTION, SERVING, formatAmount, ingredientFromRecipe, isRecipe, preparedWeight, rawWeight, recipeTotals, searchLibrary,
+  BATCH, MEALS, MEAL_LABELS, QUICK_ADD_PORTION, SERVING, formatAmount, ingredientFromRecipe, isRecipe, isWeighed, preparedWeight, rawWeight,
+  recipeTotals, searchLibrary, yieldOf,
   type Entry, type Food, type LibraryItem, type Meal, type Nutrition, type Recipe,
 } from "@nutrisage/shared";
 import { estimate } from "../../api/estimate";
 import { NetworkError } from "../../api/errors";
+import { putYieldRatio, suggestYieldRatio } from "../../api/library";
 import { addRecipe, deleteRecipe, putRecipe } from "../../api/recipes";
 import { AmountPicker } from "../../components/AmountPicker";
 import { forgetFavorite } from "../../library/useFavorites";
 import { forgetRecipe, rememberFood, rememberRecipe, useLibrary } from "../../library/useLibrary";
 import {
-  PORTION_UNITS, foodFromEstimate, readBuilder, readEdit, readPrepared, readRows, rowName, rowUnits, rowsFromRecipe, switchPortionUnit, type IngredientRow,
+  PORTION_UNITS, foodFromEstimate, needsYieldSuggestion, preparedNote, readBuilder, readEdit, readPrepared, readRows, readYieldRatio,
+  rowName, rowUnits, rowsFromRecipe, switchPortionUnit, withYieldRatio, type IngredientRow,
 } from "./recipeBuilder";
 import "./recipe.css";
 
@@ -35,7 +38,9 @@ function Totals({ label, n, grams }: { label: string; n: Nutrition; grams?: stri
  * included), each with its own amount and unit; totals update live. With the weighed Prepared
  * weight a portion logs in g, without it as a fraction of the batch. It logs as one Entry with its
  * ingredient breakdown; "Save to Recipe Book" (on by default) also keeps the Recipe in the Library.
- * Ticket 18 adds Yield-ratio estimates of the Prepared weight.
+ * Ticket 18: unweighed, the Prepared weight is estimated from each ingredient's Yield ratio (so a
+ * portion still logs in g). A Library Food with no ratio gets one suggested by Bedrock when added;
+ * a typed ratio changes the estimate at once and is saved on the Food when the box loses focus.
  *
  * Ticket 19: saved Recipes are search matches too and join as a portion (1/4 batch to start), one
  * level deep. Given `recipe` (from the Library screen), it edits that saved Recipe instead: the saved
@@ -61,7 +66,12 @@ export function RecipeBuilder({ meal: startMeal = "snack", recipe: editing, onLo
   const [save, setSave] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const { items } = useLibrary();
+  /** Yield ratio boxes as typed, by row key (absent: show the Food's ratio). */
+  const [yieldText, setYieldText] = useState<Record<string, string>>({});
+  const [yieldErrors, setYieldErrors] = useState<Record<string, string>>({});
+  /** Food ids Bedrock is being asked about. */
+  const [suggesting, setSuggesting] = useState<ReadonlySet<string>>(new Set());
+  const { items, foods } = useLibrary();
   // A Recipe can't be an ingredient of itself.
   const library = useMemo(() => (editing ? items.filter((i) => i.id !== editing.id) : items), [items, editing]);
   const hits = useMemo(() => searchLibrary(library, query), [library, query]);
@@ -75,10 +85,57 @@ export function RecipeBuilder({ meal: startMeal = "snack", recipe: editing, onLo
   const weight = preparedWeight({ ingredients, preparedGrams: preparedGrams.ok ? preparedGrams.grams : null });
   const preview = readBuilder({ name: name || "Recipe", rows, prepared, portion, portionUnit, meal });
 
-  function addFood(food: Food) {
+  /** Rows of the same Food share its Yield ratio (Recipe and saved-ingredient rows have none to share). */
+  const sameFood = (row: IngredientRow, food: Food) => !!row.food && (food.id ? row.food.id === food.id : row.food === food);
+  /** `row` with its Food swapped, when it is a Food row. */
+  const withFood = (row: IngredientRow, food: Food): IngredientRow => (row.food ? { ...row, food } : row);
+
+  /** Ask Bedrock for the Food's Yield ratio; rows still without one take it. A failure just leaves it at 1. */
+  async function suggest(food: Food) {
+    setSuggesting((s) => new Set(s).add(food.id));
+    try {
+      const f = await suggestYieldRatio(food);
+      if (!f.yieldRatio) return;
+      rememberFood(f);
+      setRows((list) => list.map((r) => (sameFood(r, f) && !r.food?.yieldRatio ? withFood(r, f) : r)));
+    } catch {
+      // Counted as 1; the Member can type a ratio.
+    } finally {
+      setSuggesting((s) => { const n = new Set(s); n.delete(food.id); return n; });
+    }
+  }
+
+  function addFood(food: Food, { estimated = false } = {}) {
     setRows((list) => [...list, { key: crypto.randomUUID(), food, amount: "1", unit: SERVING }]);
     setQuery("");
     setError(undefined);
+    // An ingredient estimate already asked Bedrock for the ratio.
+    if (!estimated && !suggesting.has(food.id) && needsYieldSuggestion(food)) void suggest(food);
+  }
+
+  /** A typed Yield ratio: the estimate follows at once (every row of that Food). */
+  function typeYield(row: IngredientRow, text: string) {
+    setYieldText((t) => ({ ...t, [row.key]: text }));
+    setYieldErrors(({ [row.key]: _, ...rest }) => rest);
+    const r = readYieldRatio(text);
+    const food = row.food;
+    if (r.ok && food) setRows((list) => list.map((x) => (x.food && sameFood(x, food) ? withFood(x, withYieldRatio(x.food, r.ratio)) : x)));
+  }
+
+  /** On leaving the box: save a changed ratio on the Library Food, for next time. */
+  async function saveYield(row: IngredientRow) {
+    const text = yieldText[row.key];
+    if (text === undefined) return;
+    const r = readYieldRatio(text);
+    if (!r.ok) return setYieldErrors((e) => ({ ...e, [row.key]: r.error }));
+    setYieldText(({ [row.key]: _, ...rest }) => rest);
+    const inLibrary = foods.find((f) => f.id === row.food?.id);
+    if (!inLibrary || (inLibrary.yieldRatio ?? null) === r.ratio) return;
+    try {
+      rememberFood(await putYieldRatio(inLibrary, r.ratio));
+    } catch (err) {
+      setYieldErrors((e) => ({ ...e, [row.key]: `Couldn't save the Yield ratio: ${plain(err)}` }));
+    }
   }
 
   /** Add a Library match: a Food at 1 serving, a saved Recipe at 1/4 of its batch (refused when it has a Recipe in it). */
@@ -105,7 +162,7 @@ export function RecipeBuilder({ meal: startMeal = "snack", recipe: editing, onLo
     try {
       const est = await estimate(text, { ingredient: true });
       if (est.food) rememberFood(est.food);
-      addFood(foodFromEstimate(est));
+      addFood(foodFromEstimate(est), { estimated: true });
     } catch (err) {
       setError(plain(err));
     } finally {
@@ -225,6 +282,26 @@ export function RecipeBuilder({ meal: startMeal = "snack", recipe: editing, onLo
                     onAmount={(amount) => setRow(row.key, { amount })}
                     onUnit={(unit) => setRow(row.key, { unit })}
                   />
+                  {row.food && isWeighed(row.food) && (
+                    <div className="recipe-yield">
+                      <label>
+                        <span>Yield ×</span>
+                        <input
+                          aria-label="Yield ratio" inputMode="decimal" placeholder="1" autoComplete="off"
+                          value={yieldText[row.key] ?? (row.food.yieldRatio ? String(row.food.yieldRatio) : "")}
+                          onChange={(e) => typeYield(row, e.target.value)}
+                          onBlur={() => void saveYield(row)}
+                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), e.currentTarget.blur())}
+                        />
+                      </label>
+                      <small>
+                        {suggesting.has(row.food.id) ? "Asking Bedrock…"
+                          : !row.food.yieldRatio ? "Unknown, counted as 1"
+                          : ing?.grams ? `${r0(ing.grams)} g raw → ${r0(ing.grams * yieldOf(ing))} g prepared` : "Prepared / raw weight"}
+                      </small>
+                    </div>
+                  )}
+                  {yieldErrors[row.key] && <p className="error" role="alert">{yieldErrors[row.key]}</p>}
                   {errors[row.key] && <p className="error" role="alert">{errors[row.key]}</p>}
                 </li>
               );
@@ -238,8 +315,15 @@ export function RecipeBuilder({ meal: startMeal = "snack", recipe: editing, onLo
 
         <label className="recipe-field">
           <span>Prepared weight (g)</span>
-          <input aria-label="Prepared weight" inputMode="decimal" placeholder="Weigh the finished batch" value={prepared} autoComplete="off" onChange={(e) => setPrepared(e.target.value)} />
-          <small>{preparedGrams.ok ? (weight ? "Weighed" : "Needed to log in g; a fraction of the batch works without it") : preparedGrams.error}</small>
+          <input
+            aria-label="Prepared weight" inputMode="decimal" autoComplete="off" value={prepared} onChange={(e) => setPrepared(e.target.value)}
+            placeholder={weight?.source === "estimated" ? `Estimated ${r0(weight.grams)} g` : "Weigh the finished batch"}
+          />
+          {rows.length > 0 && (
+            <small className="prepared-note" data-source={preparedGrams.ok ? (weight?.source ?? "unknown") : "error"}>
+              {preparedGrams.ok ? preparedNote(weight) : preparedGrams.error}
+            </small>
+          )}
         </label>
 
         {!editing && (
