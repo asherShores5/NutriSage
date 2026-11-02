@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { searchLibrary } from "./search";
+import { enterMatch, searchLibrary } from "./search";
 
 const item = (id: string, name: string) => ({ id, name });
 const LIBRARY = [
@@ -76,5 +76,31 @@ describe("searchLibrary (fuzzy search in the add box)", () => {
   it("puts the item named exactly that above longer names holding the same word", () => {
     const rice = [item("fr", "Fried rice"), item("rb", "Rice and beans"), item("r", "Rice")];
     expect(searchLibrary(rice, "rice").map((h) => h.item.name)).toEqual(["Rice", "Fried rice", "Rice and beans"]);
+  });
+});
+
+describe("enterMatch (what Enter logs in the add box)", () => {
+  const enter = (q: string, opts?: Parameters<typeof searchLibrary>[2]) => enterMatch(searchLibrary(LIBRARY, q, opts))?.name;
+
+  it("logs the top match when every word of its name was typed, typos and partial words allowed", () => {
+    expect(enter("chik brst")).toBe("Chicken breast");
+    expect(enter("chiken breast")).toBe("Chicken breast");
+    expect(enter("Greek yoghurt")).toBe("Greek yogurt");
+    expect(enter("eggs scrambled")).toBe("2 eggs scrambled"); // a count in the name or the text is the amount
+    expect(enter("2 chik brst")).toBe("Chicken breast");
+  });
+
+  it("estimates instead when part of the name wasn't typed: 'apple' isn't Apple pie", () => {
+    expect(enter("apple")).toBeUndefined();
+    expect(enter("chicken")).toBeUndefined();
+  });
+
+  it("estimates when the text names more than the match: 'chicken breast sandwich'", () => {
+    expect(enter("chicken breast sandwich")).toBeUndefined();
+  });
+
+  it("skips a starred match that doesn't cover the text for one below that does", () => {
+    const lib = [item("ap", "Apple pie"), item("a", "Apple")];
+    expect(enterMatch(searchLibrary(lib, "apple", { favoriteIds: new Set(["ap"]) }))?.name).toBe("Apple");
   });
 });

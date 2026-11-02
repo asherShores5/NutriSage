@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BATCH, MEALS, MEAL_LABELS, QUICK_ADD_PORTION, SERVING, formatAmount, ingredientFromRecipe, isRecipe, isWeighed, preparedWeight, rawWeight,
-  recipeTotals, searchLibrary, yieldOf,
+  enterMatch, recipeTotals, searchLibrary, yieldOf,
   type Entry, type Food, type LibraryItem, type Meal, type Nutrition, type Recipe,
 } from "@nutrisage/shared";
 import { estimate } from "../../api/estimate";
@@ -155,8 +155,8 @@ export function RecipeBuilder({ meal: startMeal = "snack", recipe: editing, onLo
     if (busy) return;
     const text = query.trim();
     if (!text) return setError("Type an ingredient to search or estimate");
-    const whole = hits.find((h) => h.whole)?.item;
-    if (whole) return addItem(whole);
+    const match = enterMatch(hits);
+    if (match) return addItem(match);
     setBusy(true);
     setError(undefined);
     try {
@@ -247,7 +247,7 @@ export function RecipeBuilder({ meal: startMeal = "snack", recipe: editing, onLo
         <form className="recipe-add" aria-label="Add an ingredient" onSubmit={addIngredient}>
           <div className="recipe-add-row">
             <input aria-label="Ingredient" placeholder="Search the Library or type a new Food" value={query} autoComplete="off" onChange={(e) => setQuery(e.target.value)} />
-            <button disabled={busy}>{busy && !editing ? "Estimating…" : hits.some((h) => h.whole) ? "Add" : "Estimate"}</button>
+            <button disabled={busy}>{busy && !editing ? "Estimating…" : enterMatch(hits) ? "Add" : "Estimate"}</button>
           </div>
           {hits.length > 0 && (
             <ul className="search-hits" role="listbox" aria-label="Library matches">
