@@ -69,6 +69,15 @@ async function sweep(p: Page, name: string) {
   await p.getByRole("group", { name: "Day" }).getByRole("button", { name: "Previous Day" }).click();
   await p.waitForTimeout(200);
   await shot(p, `tour-${name}-01d-yesterday`);
+  // The Recipe builder (ticket 17), opened from the add box, with one ingredient.
+  await p.getByRole("button", { name: "Build a Recipe" }).click();
+  const rb = p.getByRole("dialog", { name: "Recipe builder" });
+  await rb.getByLabel("Recipe name").fill("Chicken rice bowl");
+  await rb.getByLabel("Ingredient", { exact: true }).fill("chicken thigh");
+  await rb.getByLabel("Ingredient", { exact: true }).press("Enter");
+  await rb.getByLabel("Prepared weight").fill("600");
+  await shot(p, `tour-${name}-01e-recipe-builder`);
+  await rb.getByRole("button", { name: "Cancel" }).click();
 }
 
 await sweep(await app.open("asher"), "phone");

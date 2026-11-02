@@ -35,6 +35,8 @@ async function launch() {
     estimate: await import("./api/estimate"),
     goals: await import("./api/goals"),
     library: await import("./api/library"),
+    recipes: await import("./api/recipes"),
+    store: await import("./guest/store"),
     favorites: await import("./api/favorites"),
   };
 }
@@ -172,6 +174,27 @@ describe("a Guest", () => {
     const { library } = await launch();
     const [apple] = await library.getLibrary();
     expect(apple).toMatchObject({ id: "demo-apple", name: "Apple", units: [{ label: "serving", grams: 1 }], nutrition: { calories: 95 } });
+  });
+
+  it("estimates a Recipe ingredient through the Guest endpoint, asking for its Yield ratio", async () => {
+    const { session, estimate } = await launch();
+    session.enterGuest();
+    await estimate.estimate("dry rice", { ingredient: true });
+    expect(requests).toEqual([{ url: "https://guest.example/estimate", body: { text: "dry rice", ingredient: true } }]);
+  });
+
+  it("saves a Recipe to their own device Recipe Book, with the same checks as a Member", async () => {
+    const { session, recipes, store } = await launch();
+    session.enterGuest();
+    const n = { carbs: 0, protein: 0, fat: 0, fiber: 0, sodium: 0, iron: 0, calories: 100 };
+    const chili = { name: "Chili", ingredients: [{ libraryId: null, name: "Beans", amount: 1, unit: "can", grams: 400, nutrition: n }], preparedGrams: 380 };
+    const saved = await recipes.addRecipe("r1", chili);
+    expect(saved).toMatchObject({ id: "r1", name: "Chili", preparedGrams: 380 });
+    expect((await launch()).store.guestRecipes()).toEqual([saved]);
+    await expect(recipes.addRecipe("r2", { ...chili, name: "chili" })).rejects.toThrow("The Recipe Book already has Chili");
+    await expect(recipes.addRecipe("r3", { ...chili, ingredients: [] })).rejects.toThrow("Add at least one ingredient");
+    expect(store.guestRecipes()).toHaveLength(1);
+    expect(requests).toEqual([]);
   });
 
   it("sees the server's limit message as is", async () => {

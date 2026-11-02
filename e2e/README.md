@@ -19,6 +19,7 @@ Not a workspace, so CI never installs it.
     npx tsx favorites.ts       # star from Entries, Quick Add newest first, logging bumps to the top; per Member; Guest on device
     npx tsx library.ts         # an estimate joins the shared Library; the other Member logs it by amount x unit
     npx tsx search.ts          # fuzzy search in the add box: 'chik brst', typos, arrow keys, nonsense + Enter estimates, Guest Library
+    npx tsx recipes.ts         # Recipe builder: 3 ingredients (one estimated), live totals, log 350 g, expand the breakdown; 1/4 batch unsaved
     npx tsx week.ts            # Week streak/averages/total vs seeded Days; Trends metric chart
     npx tsx trends.ts          # Trends gaps: no data on unlogged Days, dashed bridges, today in progress
     npx tsx trendsYAxis.ts     # Trends Y-axis: fit, from 0, manual min/max; goal line (water goal; none for weight)

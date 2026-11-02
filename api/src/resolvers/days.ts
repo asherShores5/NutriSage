@@ -1,6 +1,6 @@
 // Days: a Member reads and writes only their own (spec: API contract). Schema: schema/days.graphql.
 import { QueryCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { MEALS, NUTRIENT_KEYS, amountMax, isAmount, isDateKey, type Day, type Entry, type Nutrition } from "@nutrisage/shared";
+import { MEALS, NUTRIENT_KEYS, RECIPE_LIMITS, amountMax, isAmount, isDateKey, type Day, type Entry, type EntryIngredient, type Nutrition } from "@nutrisage/shared";
 import { invalid } from "../errors";
 import { TABLE, dayKey, ddb, memberPk, strip } from "../table";
 import type { ResolverModule } from "./types";
@@ -33,10 +33,36 @@ function validateEntry(e: unknown): Entry {
   const grams = optionalIn(src.grams, DAY_LIMITS.grams, "grams");
   const ref = src.libraryId;
   if (ref !== null && ref !== undefined && (typeof ref !== "string" || !ID_RE.test(ref))) throw invalid("bad Library reference");
+  const ingredients = validateIngredients(src.ingredients);
   return {
     id: src.id, meal: src.meal as Entry["meal"], name, nutrition: validateNutrition(src.nutrition),
     ...(grams === null ? {} : { grams }), ...validateAmount(src), ...(typeof ref === "string" ? { libraryId: ref } : {}),
+    ...(ingredients ? { ingredients } : {}),
   };
+}
+
+/**
+ * A Recipe Entry's breakdown (ticket 17): a snapshot for display, so only names and numbers are
+ * checked. Its amounts are shares of the Recipe's (e.g. 0.3 can), not logged amounts, so they
+ * aren't held to the 100-unit limit.
+ */
+function validateIngredients(v: unknown): EntryIngredient[] | null {
+  if (v === null || v === undefined) return null;
+  if (!Array.isArray(v)) throw invalid("ingredients must be a list");
+  if (v.length > RECIPE_LIMITS.ingredients) throw invalid(`at most ${RECIPE_LIMITS.ingredients} ingredients`);
+  return v.map((i) => {
+    const src = (i ?? {}) as Record<string, unknown>;
+    const name = typeof src.name === "string" ? src.name.trim() : "";
+    if (!name || name.length > DAY_LIMITS.nameLength) throw invalid(`ingredient name must be 1-${DAY_LIMITS.nameLength} characters`);
+    const grams = optionalIn(src.grams, DAY_LIMITS.grams, "ingredient grams");
+    const amount = optionalIn(src.amount, DAY_LIMITS.grams, "ingredient amount");
+    const unit = src.unit === null || src.unit === undefined ? null : typeof src.unit === "string" ? src.unit.trim() : "";
+    if (unit !== null && (!unit || unit.length > DAY_LIMITS.unitLength)) throw invalid(`ingredient unit must be 1-${DAY_LIMITS.unitLength} characters`);
+    return {
+      name, nutrition: validateNutrition(src.nutrition),
+      ...(grams ? { grams } : {}), ...(amount ? { amount } : {}), ...(unit ? { unit } : {}),
+    };
+  });
 }
 
 /** Amount and unit come together, or neither (a migrated Entry, which counts as 1 serving). */

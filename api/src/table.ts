@@ -1,7 +1,7 @@
 // Table layout (spec: Data). One table, keys PK/SK:
 //   MEMBER#<username> / DAY#YYYY-MM-DD   one Member's Day
 //   MEMBER#<username> / GOALS, MEAL_WINDOWS, FAV#<libraryId>  that Member's goals, Meal windows, Favorites
-//   HOUSEHOLD         / FOOD#<id>, RECIPE#<id>   the shared Library (Foods: ticket 12; Recipes later)
+//   HOUSEHOLD         / FOOD#<id>, RECIPE#<id>   the shared Library (Foods: ticket 12; Recipes: ticket 17)
 // Partitions are keyed by Cognito username: Members are admin-created and allowlisted, and the
 // username is what the migration (ticket 16) knows the old data by.
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -13,6 +13,7 @@ export const memberPk = (username: string) => `MEMBER#${username}`;
 export const HOUSEHOLD_PK = "HOUSEHOLD";
 export const dayKey = (date: string) => `DAY#${date}`;
 export const foodKey = (id: string) => `FOOD#${id}`;
+export const recipeKey = (id: string) => `RECIPE#${id}`;
 export const GOALS_SK = "GOALS";
 export const MEAL_WINDOWS_SK = "MEAL_WINDOWS";
 export const favoriteKey = (libraryId: string) => `FAV#${libraryId}`;
