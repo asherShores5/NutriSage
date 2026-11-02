@@ -39,4 +39,22 @@ describe("fakeDynamo matches DynamoDB", () => {
     );
     expect(r).toEqual({ Count: 2, LastEvaluatedKey: undefined });
   });
+
+  it("transaction Updates count with if_not_exists and are refused together", async () => {
+    const db = new FakeDocClient();
+    const bump = (SK: string, cap: number) => ({
+      Update: {
+        TableName: "t", Key: { PK: "p", SK },
+        UpdateExpression: "SET #n = if_not_exists(#n,:zero) + :one, e = :e",
+        ConditionExpression: "attribute_not_exists(#n) OR #n < :cap",
+        ExpressionAttributeNames: { "#n": "count" }, ExpressionAttributeValues: { ":zero": 0, ":one": 1, ":cap": cap, ":e": 9 },
+      },
+    });
+    await db.send(new TransactWriteCommand({ TransactItems: [bump("a", 1), bump("b", 5)] }));
+    expect(db.dump()).toEqual([{ PK: "p", SK: "a", count: 1, e: 9 }, { PK: "p", SK: "b", count: 1, e: 9 }]);
+    await expect(db.send(new TransactWriteCommand({ TransactItems: [bump("a", 1), bump("b", 5)] }))).rejects.toMatchObject({
+      name: "TransactionCanceledException", CancellationReasons: [{ Code: "ConditionalCheckFailed" }, { Code: "None" }],
+    });
+    expect(db.dump().map((r) => r.count)).toEqual([1, 1]);
+  });
 });

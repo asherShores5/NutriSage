@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { lastUsername, signInWithPasskey, signInWithPassword } from "../auth";
+import { enterGuest } from "../session";
 
 /**
  * Sign-in: a passkey first (Face ID on iPhone; iCloud Keychain or a phone QR on desktop), with the
@@ -51,6 +52,10 @@ export function Login() {
         </>
       )}
       {error && <p className="error" role="alert">{error}</p>}
+      <div className="guest-entry">
+        <button type="button" onClick={enterGuest}>Try it as a Guest</button>
+        <p className="hint">No sign-in. Demo Days to start with; what you log stays on this device.</p>
+      </div>
     </form>
   );
 }

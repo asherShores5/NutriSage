@@ -14,6 +14,7 @@ Not a workspace, so CI never installs it.
     npx tsx parity.ts          # Today parity: Goals, every Meal incl. Dessert, bars, water, weight, theme
     npx tsx move.ts            # move an Entry to another Meal and Day, delete one; Day navigation, Clear day
     npx tsx estimate.ts        # type a Food, log the (stubbed) Bedrock estimate
+    npx tsx guest.ts           # Guest mode: demo data, capped estimates (cap 2 here), leave Guest mode
     npx tsx passkeys.ts        # add a passkey, sign in with it (virtual authenticator), password backup
     npx tsx tour.ts            # screenshots of every tab: phone, desktop, dark
 
