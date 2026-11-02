@@ -41,7 +41,7 @@ await c.check("the header shows Today, with arrows to the previous and next Day"
 await c.check("moves an Entry from Lunch to Dinner, keeping its nutrition", async () => {
   await logByHand("Burrito bowl", "lunch", "680");
   await logByHand("Apple", "snack", "95");
-  await entries.getByRole("button", { name: /Burrito bowl/ }).click();
+  await entries.getByRole("button", { name: /^Burrito bowl/ }).click();
   await editor("Burrito bowl").getByLabel("Meal").selectOption("dinner");
   await expect(entries.getByRole("group", { name: "Dinner" }).getByText("Burrito bowl")).toBeVisible();
   await expect(entries.getByRole("group", { name: "Lunch" })).toHaveCount(0);
@@ -74,7 +74,7 @@ await c.check("the previous-Day arrow shows yesterday with the moved Entry under
 });
 
 await c.check("deletes an Entry from its editor", async () => {
-  await entries.getByRole("button", { name: /Burrito bowl/ }).click();
+  await entries.getByRole("button", { name: /^Burrito bowl/ }).click();
   await editor("Burrito bowl").getByRole("button", { name: "Delete" }).click();
   await expect(p.getByText("Nothing logged yet.")).toBeVisible();
   await expect.poll(() => stored(yesterday)?.entries?.length).toBe(0);

@@ -3,6 +3,7 @@
 export * from "./amount";
 export * from "./bars";
 export * from "./day";
+export * from "./favorites";
 export * from "./food";
 export * from "./goals";
 export * from "./guest";

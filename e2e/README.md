@@ -16,6 +16,7 @@ Not a workspace, so CI never installs it.
     npx tsx estimate.ts        # type a Food, log the (stubbed) Bedrock estimate
     npx tsx offline.ts         # log offline, reload offline (service worker), sync back; phone -> desktop on focus
     npx tsx amounts.ts         # amounts (1 1/2, 1/3), unit picker, quick picks, rescaling in the editor
+    npx tsx favorites.ts       # star from Entries, Quick Add newest first, logging bumps to the top; per Member; Guest on device
     npx tsx library.ts         # an estimate joins the shared Library; the other Member logs it by amount x unit
     npx tsx week.ts            # Week streak/averages/total vs seeded Days; Trends metric chart
     npx tsx trends.ts          # Trends gaps: no data on unlogged Days, dashed bridges, today in progress

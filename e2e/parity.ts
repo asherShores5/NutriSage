@@ -104,7 +104,7 @@ await c.check("weight is once per Day, refuses junk, saves with Entries and wate
 });
 
 await c.check("an Entry deletes from its editor and the bars follow", async () => {
-  await entries.getByRole("button", { name: /Dessert food/ }).click();
+  await entries.getByRole("button", { name: /^Dessert food/ }).click();
   await entries.getByRole("group", { name: "Edit Dessert food" }).getByRole("button", { name: "Delete" }).click();
   await expect(entries.getByText("Dessert food")).toHaveCount(0);
   await expect(entries.getByRole("heading")).toHaveText(["Breakfast", "Lunch", "Dinner", "Snack"]);

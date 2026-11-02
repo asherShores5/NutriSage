@@ -35,6 +35,7 @@ async function launch() {
     estimate: await import("./api/estimate"),
     goals: await import("./api/goals"),
     library: await import("./api/library"),
+    favorites: await import("./api/favorites"),
   };
 }
 
@@ -94,6 +95,22 @@ describe("a Guest", () => {
     await goals.putGoals({ ...(await goals.getGoals()), calories: 1800 });
     const again = await launch();
     expect((await again.goals.getGoals()).calories).toBe(1800);
+    expect(requests).toEqual([]);
+  });
+
+  it("keeps Favorites on this device only: star, bump, unstar, across a relaunch", async () => {
+    const { session, favorites, library } = await launch();
+    session.enterGuest();
+    const [a, b] = await library.getLibrary();
+    expect(await favorites.getFavorites()).toEqual([]);
+    await favorites.putFavorite({ libraryId: a.id, lastUsed: 100 });
+    await favorites.putFavorite({ libraryId: b.id, lastUsed: 200 });
+    // An older bump never moves lastUsed backwards, like the Member API.
+    expect(await favorites.putFavorite({ libraryId: b.id, lastUsed: 150 })).toEqual({ libraryId: b.id, lastUsed: 200 });
+    const again = await launch();
+    expect(await again.favorites.getFavorites()).toEqual([{ libraryId: a.id, lastUsed: 100 }, { libraryId: b.id, lastUsed: 200 }]);
+    await again.favorites.deleteFavorite(a.id);
+    expect(await again.favorites.getFavorites()).toEqual([{ libraryId: b.id, lastUsed: 200 }]);
     expect(requests).toEqual([]);
   });
 

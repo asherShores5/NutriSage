@@ -1,8 +1,8 @@
 // A Guest's data, in this browser's storage only (spec: Guest access). Nothing here talks to a
-// server. Shape: { days: { [date]: Day }, library: Food[], goals: Goals }.
+// server. Shape: { days: { [date]: Day }, library: Food[], goals: Goals, favorites: Favorite[] }.
 import {
   GUEST_CREATOR, NUTRIENT_KEYS, defaultGoals, findFoodByName, foodFromServing, guestSeed,
-  type Day, type Food, type Goals, type ServingInput,
+  type Day, type Favorite, type Food, type Goals, type ServingInput,
 } from "@nutrisage/shared";
 
 const KEY = "nutrisage.guest.data";
@@ -11,6 +11,7 @@ interface GuestData {
   days: Record<string, Day>;
   library: Food[];
   goals: Goals;
+  favorites: Favorite[];
 }
 
 /** A stored Library item as a Food. Devices seeded before ticket 12 hold one serving's nutrition and no units. */
@@ -22,11 +23,11 @@ function asFood(f: any): Food {
 function read(): GuestData {
   try {
     const d = JSON.parse(localStorage.getItem(KEY) ?? "null");
-    if (d && typeof d === "object") return { days: d.days ?? {}, library: (Array.isArray(d.library) ? d.library : []).map(asFood), goals: { ...defaultGoals(), ...d.goals } };
+    if (d && typeof d === "object") return { days: d.days ?? {}, library: (Array.isArray(d.library) ? d.library : []).map(asFood), goals: { ...defaultGoals(), ...d.goals }, favorites: Array.isArray(d.favorites) ? d.favorites : [] };
   } catch {
     // unreadable: start over
   }
-  return { days: {}, library: [], goals: defaultGoals() };
+  return { days: {}, library: [], goals: defaultGoals(), favorites: [] };
 }
 
 const write = (d: GuestData) => localStorage.setItem(KEY, JSON.stringify(d));
@@ -35,7 +36,7 @@ const write = (d: GuestData) => localStorage.setItem(KEY, JSON.stringify(d));
 export function seedGuestData(today: string) {
   if (localStorage.getItem(KEY)) return;
   const seed = guestSeed(today);
-  write({ days: Object.fromEntries(seed.days.map((d) => [d.date, d])), library: seed.library, goals: seed.goals });
+  write({ days: Object.fromEntries(seed.days.map((d) => [d.date, d])), library: seed.library, goals: seed.goals, favorites: [] });
 }
 
 export function clearGuestData() {
@@ -89,4 +90,28 @@ export function putGuestGoals(goals: Goals): Goals {
   data.goals = { ...goals };
   write(data);
   return data.goals;
+}
+
+/** The Guest's Favorites, like the Member `favorites` query. */
+export function guestFavorites(): Favorite[] {
+  return read().favorites;
+}
+
+/** Star an item or bump it, like the Member `putFavorite`: an older lastUsed keeps the stored one. */
+export function putGuestFavorite(fav: Favorite): Favorite {
+  const data = read();
+  const stored = data.favorites.find((f) => f.libraryId === fav.libraryId);
+  if (stored && stored.lastUsed >= fav.lastUsed) return stored;
+  const saved = { libraryId: fav.libraryId, lastUsed: fav.lastUsed };
+  data.favorites = stored ? data.favorites.map((f) => (f.libraryId === fav.libraryId ? saved : f)) : [...data.favorites, saved];
+  write(data);
+  return saved;
+}
+
+/** Unstar an item, like the Member `deleteFavorite`. */
+export function deleteGuestFavorite(libraryId: string): string {
+  const data = read();
+  data.favorites = data.favorites.filter((f) => f.libraryId !== libraryId);
+  write(data);
+  return libraryId;
 }
