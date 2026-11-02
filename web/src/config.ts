@@ -3,6 +3,8 @@ export interface Config {
   userPoolId: string;
   clientId: string;
   graphqlUrl: string;
+  /** The Guest estimate endpoint (stack output GuestEstimateUrl). Without it, Guests can't estimate. */
+  guestEstimateUrl?: string;
 }
 
 let config: Config | undefined;

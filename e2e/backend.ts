@@ -22,6 +22,13 @@ const { handler, setDocClient, setBedrockClient } = await import("../api/src/han
 const { FakeDocClient } = await import("../api/src/testing/fakeDynamo");
 const { FakeBedrock } = await import("../api/src/testing/fakeBedrock");
 const { appSyncEvent } = await import("../api/src/testing/harness");
+// The Guest estimate endpoint: the real Guest Lambda handler on its own in-memory cap table,
+// with a small per-IP cap so a check can reach it.
+export const GUEST_IP_CAP = 2;
+process.env.GUEST_IP_DAILY_CAP = String(GUEST_IP_CAP);
+process.env.GUEST_DAILY_CEILING = "50";
+const { guestHarness } = await import("../api/src/testing/guestHarness");
+const guest = guestHarness();
 
 export const db = new FakeDocClient();
 setDocClient(db);
@@ -52,6 +59,18 @@ export async function graphql(token: string | undefined, query: string, variable
   const result = await execute({ schema, document: parse(query), variableValues: variables, fieldResolver });
   return JSON.parse(JSON.stringify(result));
 }
+
+/** Every request to the Guest endpoint, so a check can assert what a Guest sent. */
+export const guestCalls: { path: string; body: unknown }[] = [];
+
+/** One request to the Guest estimate endpoint, from `ip`. */
+export async function guestRequest(method: string, path: string, raw: string | undefined, ip = "203.0.113.50") {
+  guestCalls.push({ path, body: raw ? JSON.parse(raw) : undefined });
+  return guest.post(undefined, { method, path, raw, ip });
+}
+
+/** Forget the Guest caps (a new day). */
+export const resetGuestCaps = () => guest.reset();
 
 // ---- Cognito (only the calls web/src/auth.ts makes) -----------------------
 
