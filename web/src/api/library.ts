@@ -1,6 +1,6 @@
 // The shared Library (schema/library.graphql). A Guest gets their own device Library instead
 // (guest/store.ts) and never the household's. Screens read it through library/useLibrary.ts.
-import type { Food, FoodEdit } from "@nutrisage/shared";
+import { foodEdit, type Food, type FoodEdit } from "@nutrisage/shared";
 import { deleteGuestFood, guestLibrary, putGuestFood } from "../guest/store";
 import { isGuest } from "../session";
 import { NUTRITION, gql } from "./gql";
@@ -29,3 +29,15 @@ export async function deleteFood(id: string): Promise<string> {
   if (isGuest()) return deleteGuestFood(id);
   return (await gql<{ deleteFood: string }>(`mutation ($id: ID!) { deleteFood(id: $id) }`, { id })).deleteFood;
 }
+
+/**
+ * Bedrock's Yield ratio for a Library Food that has none, saved on the Food (the Recipe builder
+ * asks). A Guest's Food comes back unchanged: suggestions would spend the Guest's capped estimates.
+ */
+export async function suggestYieldRatio(food: Food): Promise<Food> {
+  if (isGuest()) return food;
+  return (await gql<{ suggestYieldRatio: Food }>(`mutation ($id: ID!) { suggestYieldRatio(id: $id) { ${FOOD} } }`, { id: food.id })).suggestYieldRatio;
+}
+
+/** Save a Food's Yield ratio (null clears it) through the Library edit, keeping everything else as `food` has it. */
+export const putYieldRatio = (food: Food, yieldRatio: number | null): Promise<Food> => putFood(food.id, { ...foodEdit(food), yieldRatio });

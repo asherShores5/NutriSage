@@ -4,9 +4,10 @@
 // is logged in g (needs the Prepared weight) or as a fraction of the batch, as one Entry that also
 // snapshots its ingredient breakdown for that portion.
 //
+// When the batch wasn't weighed, the Prepared weight is estimated from each ingredient's Yield ratio
+// (ticket 18), so logging in g works on the estimate too.
+//
 // Room left for later tickets:
-// - 18: `preparedWeight` estimates from each ingredient's `yieldRatio` when the batch wasn't weighed
-//   (source "estimated"); logging in g then works without a weighed value.
 // - 19: an ingredient may be a portion of a saved Recipe (its `libraryId` a RECIPE id), one level deep;
 //   its snapshot is just another ingredient here, so totals and portions need no change.
 import { amountMax, isAmount } from "./amount";
@@ -30,7 +31,7 @@ export interface RecipeIngredient {
   grams?: number | null;
   /** Nutrition of that amount. */
   nutrition: Nutrition;
-  /** The Food's Yield ratio (prepared / raw weight), when known; ticket 18 estimates Prepared weight from it. */
+  /** The Food's Yield ratio (prepared / raw weight), when known; an unweighed Prepared weight is estimated from it. */
   yieldRatio?: number | null;
 }
 
@@ -86,13 +87,22 @@ export function rawWeight(recipe: Pick<NewRecipe, "ingredients">): number | null
   return tidy(recipe.ingredients.reduce((t, i) => t + num(i.grams), 0));
 }
 
-/** Where a Prepared weight came from: weighed by a Member (ticket 18 adds "estimated" from Yield ratios). */
-export type PreparedWeightSource = "weighed";
+/** Where a Prepared weight came from: weighed by a Member, or estimated from the Yield ratios. */
+export type PreparedWeightSource = "weighed" | "estimated";
 
-/** The Recipe's Prepared weight, or null when it isn't known yet. */
+/** An ingredient's Yield ratio, or 1 when none is known. */
+export const yieldOf = (i: Pick<RecipeIngredient, "yieldRatio">): number =>
+  typeof i.yieldRatio === "number" && Number.isFinite(i.yieldRatio) && i.yieldRatio > 0 ? i.yieldRatio : 1;
+
+/**
+ * The Recipe's Prepared weight: the weighed value when set, else the sum of each ingredient's grams
+ * times its Yield ratio (1 when unknown). Null when not weighed and an ingredient's grams are unknown.
+ */
 export function preparedWeight(recipe: Pick<NewRecipe, "preparedGrams" | "ingredients">): { grams: number; source: PreparedWeightSource } | null {
   const g = recipe.preparedGrams;
-  return typeof g === "number" && Number.isFinite(g) && g > 0 ? { grams: g, source: "weighed" } : null;
+  if (typeof g === "number" && Number.isFinite(g) && g > 0) return { grams: g, source: "weighed" };
+  if (rawWeight(recipe) === null) return null;
+  return { grams: tidy(recipe.ingredients.reduce((t, i) => t + num(i.grams) * yieldOf(i), 0)), source: "estimated" };
 }
 
 export type LogRecipeResult = { ok: true; entry: Omit<Entry, "id"> } | { ok: false; error: string };

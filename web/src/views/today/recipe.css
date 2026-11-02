@@ -15,6 +15,11 @@
 .recipe-ingredient-head .entry-name { flex: 1; }
 .recipe-builder .link { background: none; border: 0; padding: 0; height: auto; color: var(--accent); }
 .recipe-builder .danger-link { color: var(--danger); }
+.recipe-yield { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; font-size: 0.85rem; color: var(--muted); }
+.recipe-yield label { display: flex; align-items: center; gap: 0.35rem; }
+.recipe-yield input { width: 4.5rem; }
+.recipe-yield small { font-size: 0.78rem; }
+.prepared-note[data-source="estimated"] { color: var(--accent); }
 .recipe-totals { margin: 0; display: grid; gap: 0.15rem; font-variant-numeric: tabular-nums; }
 .recipe-totals span { color: var(--muted); font-size: 0.8rem; }
 .recipe-portion { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }

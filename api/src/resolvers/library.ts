@@ -5,12 +5,15 @@
 // every estimated Food lands here (names deduplicated case-insensitively). Ticket 15: putFood (edit,
 // either Member) and deleteFood (also removes every Member's Favorite of it). Ticket 17: Recipes at
 // RECIPE#<id> and addRecipe (save to the Recipe Book); ticket 19 adds editing and deleting them.
-import { PutCommand, QueryCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+// Ticket 18: suggestYieldRatio (Bedrock fills in a Food's missing Yield ratio, for the Recipe
+// builder) and ingredient estimates filling in a known Food's missing ratio. A ratio a Member typed
+// (putFood) is never overwritten by a suggestion.
+import { GetCommand, PutCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import {
   NUTRIENT_KEYS, checkRecipe, editedFood, findFoodByName, foodFromServing, foodNameKey, type Food, type FoodEdit, type NewRecipe, type Recipe,
 } from "@nutrisage/shared";
 import { UserError, invalid } from "../errors";
-import type { Estimate } from "../estimate";
+import { estimateFood, type Estimate } from "../estimate";
 import { HOUSEHOLD_PK, TABLE, ddb, favoriteKey, foodKey, memberPk, recipeKey, strip } from "../table";
 import type { ResolverModule } from "./types";
 
@@ -53,7 +56,7 @@ export async function addEstimatedFood(username: string, est: Estimate): Promise
   if (NUTRIENT_KEYS.every((k) => !est.nutrition[k])) return null;
   const foods = await listFoods();
   const existing = findFoodByName(foods, est.name);
-  if (existing) return existing;
+  if (existing) return est.yieldRatio ? fillYieldRatio(existing, est.yieldRatio) : existing;
   if (foods.length >= LIBRARY_LIMITS.foods) return null;
   const food: Food = {
     id: crypto.randomUUID(),
@@ -65,6 +68,54 @@ export async function addEstimatedFood(username: string, est: Estimate): Promise
     new PutCommand({ TableName: TABLE, Item: { PK: HOUSEHOLD_PK, SK: foodKey(food.id), ...food }, ConditionExpression: "attribute_not_exists(PK)" }),
   );
   return food;
+}
+
+const hasYieldRatio = (f: Food) => typeof f.yieldRatio === "number" && f.yieldRatio > 0;
+
+const notFound = () => new UserError("NotFound", "That Food is no longer in the Library");
+
+async function getFood(id: string): Promise<Food | undefined> {
+  const r = await ddb().send(new GetCommand({ TableName: TABLE, Key: { PK: HOUSEHOLD_PK, SK: foodKey(id) } }));
+  return r.Item ? strip<Food>(r.Item) : undefined;
+}
+
+/**
+ * Give `food` the Yield ratio `ratio` unless it has one: a ratio already there (say a Member's edit
+ * that landed meanwhile) is kept. Returns the Food as it now is.
+ */
+async function fillYieldRatio(food: Food, ratio: number): Promise<Food> {
+  if (hasYieldRatio(food)) return food;
+  try {
+    const r = await ddb().send(
+      new UpdateCommand({
+        TableName: TABLE,
+        Key: { PK: HOUSEHOLD_PK, SK: foodKey(food.id) },
+        UpdateExpression: "SET yieldRatio = :y, updatedAt = :t",
+        ConditionExpression: "attribute_exists(PK) AND attribute_not_exists(yieldRatio)",
+        ExpressionAttributeValues: { ":y": ratio, ":t": Math.max(Date.now(), food.updatedAt) },
+        ReturnValues: "ALL_NEW",
+      }),
+    );
+    return strip<Food>(r.Attributes!);
+  } catch (e) {
+    if ((e as Error).name !== "ConditionalCheckFailedException") throw e;
+    const now = await getFood(food.id);
+    if (!now) throw notFound();
+    return now;
+  }
+}
+
+/**
+ * The Recipe builder's suggestion for a Library Food with no Yield ratio: ask Bedrock (as a recipe
+ * ingredient) and save the ratio on the Food. A Food that has one, or a reply with no believable
+ * ratio, is returned unchanged.
+ */
+async function suggestYieldRatio(id: string): Promise<Food> {
+  const food = await getFood(id);
+  if (!food) throw notFound();
+  if (hasYieldRatio(food)) return food;
+  const est = await estimateFood(food.name, { ingredient: true });
+  return est.yieldRatio ? fillYieldRatio(food, est.yieldRatio) : food;
 }
 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -171,6 +222,7 @@ export const library: ResolverModule = {
   Mutation: {
     putFood: (_ctx, args) => putFood(foodId(args.id), args.input),
     deleteFood: (_ctx, args) => deleteFood(foodId(args.id)),
+    suggestYieldRatio: (_ctx, args) => suggestYieldRatio(foodId(args.id)),
     addRecipe: (ctx, args) => addRecipe(ctx.username, recipeId(args.id), args.input),
   },
 };
