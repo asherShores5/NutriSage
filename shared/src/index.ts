@@ -4,5 +4,6 @@ export * from "./amount";
 export * from "./bars";
 export * from "./day";
 export * from "./goals";
+export * from "./guest";
 export * from "./nutrients";
 export * from "./scaling";

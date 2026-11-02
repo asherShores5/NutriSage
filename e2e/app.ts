@@ -9,13 +9,15 @@ import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, devices, type Browser, type Page } from "playwright";
-import { cognito, graphql } from "./backend";
+import { cognito, graphql, guestRequest } from "./backend";
 
 export const ORIGIN = "https://nutrisage.test";
 const GRAPHQL_URL = "https://e2e.appsync-api.us-west-1.amazonaws.com/graphql";
 const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "web", "dist");
 
-const CONFIG = { region: "us-west-1", userPoolId: "us-west-1_e2e", clientId: "e2e-client", graphqlUrl: GRAPHQL_URL };
+const GUEST_URL = "https://e2e-guest.execute-api.us-west-1.amazonaws.com";
+
+const CONFIG = { region: "us-west-1", userPoolId: "us-west-1_e2e", clientId: "e2e-client", graphqlUrl: GRAPHQL_URL, guestEstimateUrl: GUEST_URL };
 
 const TYPES: Record<string, string> = {
   ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json",
@@ -81,6 +83,12 @@ export async function launch() {
     await context.route(GRAPHQL_URL, async (route) => {
       const { query, variables } = route.request().postDataJSON();
       return route.fulfill({ json: await graphql(route.request().headers()["authorization"], query, variables) });
+    });
+
+    await context.route(`${GUEST_URL}/**`, async (route) => {
+      const req = route.request();
+      const r = await guestRequest(req.method(), new URL(req.url()).pathname, req.postData() ?? undefined);
+      return route.fulfill({ status: r.status, json: r.body, headers: { "access-control-allow-origin": ORIGIN } });
     });
 
     await page.goto(ORIGIN + "/");

@@ -14,6 +14,7 @@ Not a workspace, so CI never installs it.
     npx tsx parity.ts          # Today parity: Goals, every Meal incl. Dessert, bars, water, weight, theme
     npx tsx estimate.ts        # type a Food, log the (stubbed) Bedrock estimate
     npx tsx amounts.ts         # amounts (1 1/2, 1/3), unit picker, quick picks, rescaling in the editor
+    npx tsx guest.ts           # Guest mode: demo data, capped estimates (cap 2 here), leave Guest mode
     npx tsx passkeys.ts        # add a passkey, sign in with it (virtual authenticator), password backup
     npx tsx tour.ts            # screenshots of every tab: phone, desktop, dark
 
