@@ -1,0 +1,102 @@
+// Fake backend for browser checks (Honey Do's pattern): the real API handler on the in-memory
+// table, behind a GraphQL executor built from the composed schema/*.graphql, plus just enough
+// Cognito for the web app to sign in. Nothing here talks to AWS.
+import { buildSchema, defaultFieldResolver, execute, parse, type GraphQLFieldResolver } from "graphql";
+import { composeSchemaDir } from "../schema/compose";
+
+export interface Member {
+  userId: string;
+  username: string;
+}
+
+export const MEMBERS: Record<string, Member> = {
+  asher: { userId: "sub-asher", username: "asher" },
+  aubyn: { userId: "sub-aubyn", username: "aubyn" },
+};
+
+// handler.ts reads these at import time, so import it only after setting them.
+process.env.TABLE_NAME = "e2e-table";
+process.env.ALLOWED_USERNAMES = Object.keys(MEMBERS).join(",");
+const { handler, setDocClient } = await import("../api/src/handler");
+const { FakeDocClient } = await import("../api/src/testing/fakeDynamo");
+const { appSyncEvent } = await import("../api/src/testing/harness");
+
+export const db = new FakeDocClient();
+setDocClient(db);
+
+// AppSync supplies these scalars; graphql-js needs them declared.
+const schema = buildSchema(`scalar AWSJSON\nscalar AWSDate\n${composeSchemaDir()}`);
+
+/** Per-call log, so a check can assert what the app sent. */
+export const calls: { member: string; field: string; args: unknown }[] = [];
+
+export function memberForToken(token: string | undefined): Member | undefined {
+  const name = token?.startsWith("fake-id.") ? token.slice("fake-id.".length) : undefined;
+  return name ? MEMBERS[name] : undefined;
+}
+
+export async function graphql(token: string | undefined, query: string, variables: Record<string, unknown> = {}) {
+  const member = memberForToken(token);
+  if (!member) return { errors: [{ message: "Unauthorized", errorType: "UnauthorizedException" }] };
+  const fieldResolver: GraphQLFieldResolver<unknown, unknown> = async (src, args, ctx, info) => {
+    const parent = info.parentType.name;
+    if (parent !== "Query" && parent !== "Mutation") return defaultFieldResolver(src, args, ctx, info);
+    calls.push({ member: member.username, field: info.fieldName, args });
+    return handler(appSyncEvent(member, info.fieldName, args as Record<string, unknown>));
+  };
+  const result = await execute({ schema, document: parse(query), variableValues: variables, fieldResolver });
+  return JSON.parse(JSON.stringify(result));
+}
+
+// ---- Cognito (only the calls web/src/auth.ts makes) -----------------------
+
+export const PASSWORD = "e2e-password";
+
+const tokensFor = (username: string) => ({
+  AuthenticationResult: {
+    IdToken: `fake-id.${username}`, AccessToken: `fake-access.${username}`,
+    RefreshToken: `fake-refresh.${username}`, ExpiresIn: 3600, TokenType: "Bearer",
+  },
+});
+
+export function cognito(target: string, body: any): { status: number; json: unknown } {
+  const fail = (type: string, message: string) => ({ status: 400, json: { __type: type, message } });
+  switch (target) {
+    case "InitiateAuth": {
+      if (body.AuthFlow === "REFRESH_TOKEN_AUTH") {
+        const u = String(body.AuthParameters?.REFRESH_TOKEN ?? "").replace(/^fake-refresh\./, "");
+        return MEMBERS[u] ? { status: 200, json: { AuthenticationResult: { ...tokensFor(u).AuthenticationResult, RefreshToken: undefined } } } : fail("NotAuthorizedException", "Invalid Refresh Token");
+      }
+      const u = body.AuthParameters?.USERNAME;
+      // preventUserExistenceErrors: an unknown user looks like a wrong password.
+      if (!MEMBERS[u] || body.AuthParameters?.PASSWORD !== PASSWORD) return fail("NotAuthorizedException", "Incorrect username or password.");
+      return { status: 200, json: tokensFor(u) };
+    }
+    case "RevokeToken":
+      return { status: 200, json: {} };
+    default:
+      return fail("NotImplemented", `fake Cognito has no ${target}`);
+  }
+}
+
+// ---- seed data -------------------------------------------------------------
+
+async function as(username: string, field: string, args: Record<string, unknown>) {
+  return handler(appSyncEvent(MEMBERS[username], field, args));
+}
+
+const n = (carbs: number, protein: number, fat: number, calories: number) => ({ carbs, protein, fat, fiber: 2, sodium: 120, iron: 1, calories });
+
+/** A few Entries for asher on `date` (YYYY-MM-DD), so screens aren't empty. */
+export async function seed(date: string) {
+  await as("asher", "putDay", {
+    input: {
+      date,
+      entries: [
+        { id: "s1", meal: "breakfast", name: "Oatmeal with berries", nutrition: n(40, 8, 5, 240) },
+        { id: "s2", meal: "lunch", name: "Turkey sandwich", nutrition: n(45, 28, 12, 410) },
+        { id: "s3", meal: "dessert", name: "Dark chocolate square", nutrition: n(6, 1, 5, 70) },
+      ],
+    },
+  });
+}

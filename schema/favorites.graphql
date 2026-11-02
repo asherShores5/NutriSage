@@ -1,0 +1,2 @@
+# Favorites and Quick Add (ticket 14). Resolvers: api/src/resolvers/favorites.ts.
+# Placeholder: add types here and fields with `extend type Query { ... }` / `extend type Mutation { ... }`.

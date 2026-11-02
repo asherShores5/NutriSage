@@ -165,3 +165,14 @@ backend/function.zip
 
 # local tickets
 .scratch/
+
+# TypeScript workspaces (shared/api/web/infra)
+node_modules/
+cdk.out/
+cdk-outputs.json
+*.tsbuildinfo
+.DS_Store
+.secrets/
+web/public/config.json
+# `lib/` above is for Python; the CDK stacks live in infra/lib.
+!infra/lib/

@@ -1,0 +1,51 @@
+# Days and Entries (api/src/resolvers/days.ts). A Member reads and writes only their own.
+
+enum Meal {
+  breakfast
+  lunch
+  dinner
+  dessert
+  snack
+}
+
+type Entry {
+  id: ID!
+  meal: Meal!
+  name: String!
+  "Snapshot taken at log time; Library edits never change it."
+  nutrition: Nutrition!
+}
+
+input EntryInput {
+  id: ID!
+  meal: Meal!
+  name: String!
+  nutrition: NutritionInput!
+}
+
+type Day {
+  "YYYY-MM-DD"
+  date: String!
+  entries: [Entry!]!
+  water: Float
+  weight: Float
+  "Server time of the last write, epoch ms."
+  updatedAt: Float
+}
+
+input DayInput {
+  date: String!
+  entries: [EntryInput!]!
+  water: Float
+  weight: Float
+}
+
+extend type Query {
+  "The caller's Days from `from` to `to` (YYYY-MM-DD, inclusive), oldest first. Unlogged dates are absent."
+  days(from: String!, to: String!): [Day!]!
+}
+
+extend type Mutation {
+  "Write the caller's whole Day. Last write wins."
+  putDay(input: DayInput!): Day!
+}

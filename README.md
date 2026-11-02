@@ -1,48 +1,41 @@
-# README - NutriSageAI Project
-## Project Overview
-NutriSageAI is a Progressive Web App that helps a small family track daily food nutrition. You type a
-meal in plain language ("2 eggs and toast"); Amazon Bedrock (Claude) estimates its nutrition and it's
-logged. Data is cached locally for instant, offline-capable use and synced across devices per user.
+# NutriSage
 
-[Live Site](https://ashershores5.github.io/NutriSageAI)
+A nutrition tracker for one household. Each Member logs what they eat and drink each day against
+their own goals, drawing on a shared Library of Foods and Recipes. Terms are in
+[GLOSSARY.md](GLOSSARY.md); the plan is [docs/specs/2026-11-02-v1.md](docs/specs/2026-11-02-v1.md).
 
-![image](https://github.com/asherShores5/NutriSageAI/assets/71547146/393c3c4b-3d75-4f83-a535-4306ecbe26bf)
+NutriSage is being rebuilt on the same stack as my other apps (TypeScript, React PWA, AppSync +
+Lambda, DynamoDB, Cognito, CDK) for nutrisage.ashershores.com. Until cutover, the old plain-JS app
+in [docs/](docs/) and its Python backend in [backend/](backend/) stay live at
+[ashershores5.github.io/NutriSageAI](https://ashershores5.github.io/NutriSageAI).
 
+## Layout
 
-### Key Features
-- **Nutrition tracker** — natural-language food entry → AI-estimated `carbs, protein, fat, fiber` (g),
-  `sodium, iron` (mg), and `calories`. Entries are grouped by meal (breakfast/lunch/dinner/snack) with an
-  optional portion multiplier and one-tap quick-add of past foods.
-- **Profiles** — per-family-member data, secret-gated. A device remembers keys it has seen, so switching
-  profiles is one tap.
-- **Progress & goals** — daily and weekly progress bars against per-nutrient goals (macros and
-  micronutrients shown separately).
-- **Week & Trends** — logging streak, daily averages, and a 30-day trend chart per nutrient.
-- **Water tracking** — optional per-day cup count with a goal.
-- **Cross-device sync** — every profile's data syncs via the backend; the app still works offline from the
-  local cache.
-- **Dark mode**, installable PWA.
+- `shared/`: pure domain logic (nutrients, Days, Entries, Meals)
+- `api/`: the Member API Lambda (AppSync resolvers, one file per entity)
+- `schema/`: the GraphQL schema, one file per entity, composed by `schema/compose.ts`
+- `web/`: the React + Vite PWA
+- `infra/`: CDK stacks
+- `e2e/`: Playwright checks against an in-process fake backend (not a workspace)
 
-### Not Yet Built
-- Workout Planner: AI-suggested workout ideas and plans.
-- Barcode scanning for packaged foods (under discussion).
+## Develop
 
-## Tech Stack
-The frontend is a **static, client-side-only Progressive Web App** (no build step). The backend is a single
-serverless function; its source lives in [backend/](backend/).
+Node 22. From the repo root:
 
-1. Frontend: HTML, CSS, JavaScript (vanilla), hosted on GitHub Pages (auto-deploy on push to `main`)
-2. Storage: browser `localStorage` as the working copy; per-user server sync via DynamoDB
-3. AI + sync backend: AWS Lambda + HTTP API Gateway, using Amazon Bedrock (Claude) — see [backend/README.md](backend/README.md)
+    npm install
+    npm test            # vitest: shared, api, web, infra
+    npm run typecheck   # tsc in every workspace
+    npm run build:web   # web/dist
+    AWS_REGION=us-west-1 AWS_DEFAULT_REGION=us-west-1 npm run synth   # cdk synth, no credentials needed
 
-## For contributors / new sessions
-Architecture, deploy steps, and gotchas are documented in [CLAUDE.md](CLAUDE.md) and
-[backend/README.md](backend/README.md). Run the pure-logic tests with `node docs/macros.test.js`.
+Browser checks (after `npm run build:web`):
 
-## Contribute
-Contributions to NutriSageAI are always welcome! Here's how you can help:
+    cd e2e && npm install && npx playwright install chromium
+    npx tsx today.ts    # sign in, log an Entry, see Today
+    npx tsx tour.ts     # screenshots: phone, desktop, dark
 
-- Report bugs
-- Suggest new features
-- Write or update documentation
-- Suggest bug fixes or identify potential issues
+Running the web app against real AWS needs `web/public/config.json` (gitignored; copy
+`config.example.json` and fill in the stack outputs). Nothing is deployed yet.
+
+No AWS account or hosted zone IDs live in this repo; deploy-time values come from CDK context or
+the environment.

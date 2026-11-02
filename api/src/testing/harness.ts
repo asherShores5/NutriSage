@@ -1,0 +1,61 @@
+// Seam 2 test harness: call the real Lambda handler as either Member against an in-memory table.
+//
+//   const h = harness();
+//   beforeEach(() => h.reset());
+//   await h.call(h.A, "putDay", { input });
+//   const days = await h.call(h.B, "days", { from, to });
+//
+// handler.ts reads TABLE_NAME / ALLOWED_USERNAMES at import time, so tests must import the
+// handler through this module (never statically) for the env below to take effect.
+import type { AppSyncIdentityCognito, AppSyncResolverEvent } from "aws-lambda";
+import { FakeDocClient } from "./fakeDynamo";
+
+export interface Member {
+  userId: string;
+  username: string;
+}
+
+export const memberA: Member = { userId: "sub-a", username: "member-a" };
+export const memberB: Member = { userId: "sub-b", username: "member-b" };
+
+process.env.TABLE_NAME = process.env.TABLE_NAME ?? "test-table";
+process.env.ALLOWED_USERNAMES = process.env.ALLOWED_USERNAMES ?? `${memberA.username},${memberB.username}`;
+
+const { handler, setDocClient } = await import("../handler");
+const { QUERY_FIELDS } = await import("../resolvers");
+
+const db = new FakeDocClient();
+setDocClient(db);
+
+/** AppSync-shaped resolver event for one Member calling one field. */
+export function appSyncEvent(member: Member, fieldName: string, args: Record<string, unknown> = {}) {
+  const identity = {
+    sub: member.userId,
+    username: member.username,
+    claims: { sub: member.userId, "cognito:username": member.username },
+    issuer: "test", sourceIp: [], defaultAuthStrategy: "ALLOW", groups: null,
+  } satisfies AppSyncIdentityCognito;
+  return {
+    arguments: args,
+    identity,
+    source: null,
+    request: { headers: {}, domainName: null },
+    info: { fieldName, parentTypeName: QUERY_FIELDS.has(fieldName) ? "Query" : "Mutation", variables: args, selectionSetList: [], selectionSetGraphQL: "" },
+    prev: null,
+    stash: {},
+  } as AppSyncResolverEvent<Record<string, unknown>>;
+}
+
+export function harness() {
+  return {
+    A: memberA,
+    B: memberB,
+    db,
+    /** Empty the table. */
+    reset: () => db.reset(),
+    event: appSyncEvent,
+    /** Invoke the handler as `member`. Rejects with the same Error the client would see. */
+    call: (member: Member, fieldName: string, args: Record<string, unknown> = {}): Promise<any> =>
+      handler(appSyncEvent(member, fieldName, args)),
+  };
+}

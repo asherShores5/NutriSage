@@ -1,0 +1,18 @@
+/* Today tab. Each tab keeps its own stylesheet next to its components. */
+.totals { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: 0.5rem; margin: 0.75rem 0 1rem; }
+.total { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.65rem; display: flex; flex-direction: column; }
+.total-value { font-size: 1.2rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.total-label { color: var(--muted); font-size: 0.8rem; }
+
+.entry-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; display: grid; gap: 0.6rem; }
+.entry-form-row { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; }
+.nutrient-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: 0.5rem; }
+.nutrient-inputs label { display: grid; gap: 0.2rem; font-size: 0.8rem; color: var(--muted); }
+.nutrient-inputs input { width: 100%; }
+
+.entry-list { margin-top: 1rem; }
+.meal-group h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 1rem 0 0.4rem; }
+.meal-group ul { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.entry { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 0.75rem; }
+.entry + .entry { border-top: 1px solid var(--border); }
+.entry-cal { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
