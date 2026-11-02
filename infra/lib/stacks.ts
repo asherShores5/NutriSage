@@ -47,12 +47,15 @@ export class AppStack extends Stack {
     }));
 
     // ---- auth: admin-created Members, no self sign-up ----
-    // ESSENTIALS allows the USER_AUTH (choice-based) flow the web app uses, so ticket 03 adds
-    // passkeys (first factor + relying party = APP_DOMAIN) without changing the sign-in code path.
+    // ESSENTIALS allows the USER_AUTH (choice-based) flow: a password once, then a passkey (Face ID
+    // on iPhone; iCloud Keychain or phone QR on desktop). The password stays as the backup.
+    // The relying party is the app domain, so passkeys only work there (ticket 11 serves it).
     const userPool = (this.userPool = new cognito.UserPool(this, "Users", {
       userPoolName: "nutrisage",
       featurePlan: cognito.FeaturePlan.ESSENTIALS,
-      signInPolicy: { allowedFirstAuthFactors: { password: true } },
+      signInPolicy: { allowedFirstAuthFactors: { password: true, passkey: true } },
+      passkeyRelyingPartyId: APP_DOMAIN,
+      passkeyUserVerification: cognito.PasskeyUserVerification.REQUIRED,
       selfSignUpEnabled: false,
       signInAliases: { username: true },
       signInCaseSensitive: false,

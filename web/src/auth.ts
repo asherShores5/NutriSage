@@ -1,7 +1,9 @@
 // Cognito user-pool auth via the public JSON API (no SDK), as in Honey Do and Games Catalog.
-// Password sign-in for now; ticket 03 adds passkeys on the same USER_AUTH flow. Tokens live in
+// A password once, then a passkey (Face ID on iPhone; iCloud Keychain or phone QR on desktop),
+// both on Cognito's USER_AUTH flow. The password stays as the backup. Tokens live in
 // localStorage, so the installed PWA stays signed in across launches until the 7-day refresh token
 // runs out.
+import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { getConfig } from "./config";
 
 interface Tokens {
@@ -13,6 +15,10 @@ interface Tokens {
 }
 
 const KEY = "nutrisage.tokens";
+/** Last Member signed in on this device, so the sign-in screen is one tap. */
+const LAST_USER = "nutrisage.lastUser";
+/** Set once this device has added a passkey for the signed-in Member. Cleared on sign out. */
+const HAS_PASSKEY = "nutrisage.hasPasskey";
 let tokens: Tokens | null = JSON.parse(localStorage.getItem(KEY) ?? "null");
 const listeners = new Set<() => void>();
 
@@ -25,8 +31,12 @@ export function onAuthChange(fn: () => void) {
 
 function save(t: Tokens | null) {
   tokens = t;
-  if (t) localStorage.setItem(KEY, JSON.stringify(t));
-  else localStorage.removeItem(KEY);
+  if (t) {
+    localStorage.setItem(KEY, JSON.stringify(t));
+    localStorage.setItem(LAST_USER, t.username);
+  } else {
+    localStorage.removeItem(KEY);
+  }
   listeners.forEach((fn) => fn());
 }
 
@@ -37,6 +47,15 @@ export function isSignedIn() {
 /** The signed-in Member's username, or undefined when signed out. */
 export function currentUsername(): string | undefined {
   return tokens?.username;
+}
+
+export function lastUsername(): string | undefined {
+  return localStorage.getItem(LAST_USER) ?? undefined;
+}
+
+/** Whether this device has added a passkey for the signed-in Member (Profile hides the prompt). */
+export function hasPasskeyHere() {
+  return localStorage.getItem(HAS_PASSKEY) === "1";
 }
 
 export class CognitoError extends Error {
@@ -88,6 +107,58 @@ export async function signInWithPassword(username: string, password: string) {
   accept(r, u);
 }
 
+/** The browser's passkey prompt; a cancel or timeout (NotAllowedError) reads plainly. */
+async function webauthn<T>(prompt: () => Promise<T>): Promise<T> {
+  try {
+    return await prompt();
+  } catch (e) {
+    const err = e as Error;
+    if (err.name === "NotAllowedError" || err.name === "AbortError") throw new Error("Passkey cancelled.");
+    throw err;
+  }
+}
+
+export async function signInWithPasskey(username: string) {
+  const { clientId } = getConfig();
+  const u = username.trim().toLowerCase();
+  const r = await cognito("InitiateAuth", {
+    AuthFlow: "USER_AUTH",
+    ClientId: clientId,
+    AuthParameters: { USERNAME: u, PREFERRED_CHALLENGE: "WEB_AUTHN" },
+  });
+  if (r.ChallengeName !== "WEB_AUTHN") throw new Error("No passkey on this account yet. Sign in with your password once, then add one in Profile.");
+  const credential = await webauthn(() => startAuthentication({ optionsJSON: JSON.parse(r.ChallengeParameters.CREDENTIAL_REQUEST_OPTIONS) }));
+  const done = await cognito("RespondToAuthChallenge", {
+    ClientId: clientId,
+    ChallengeName: "WEB_AUTHN",
+    Session: r.Session,
+    ChallengeResponses: { USERNAME: u, CREDENTIAL: JSON.stringify(credential) },
+  });
+  accept(done, u);
+}
+
+/** Add a passkey for the signed-in Member. Its relying party is the app domain (set on the pool). */
+export async function registerPasskey() {
+  const accessToken = (await freshTokens()).accessToken;
+  const { CredentialCreationOptions } = await cognito("StartWebAuthnRegistration", { AccessToken: accessToken });
+  const credential = await webauthn(() => startRegistration({ optionsJSON: CredentialCreationOptions }));
+  await cognito("CompleteWebAuthnRegistration", { AccessToken: accessToken, Credential: credential });
+  localStorage.setItem(HAS_PASSKEY, "1");
+}
+
+/** Cognito's ListWebAuthnCredentials entry (CreatedAt in epoch seconds). */
+export interface Passkey {
+  CredentialId: string;
+  FriendlyCredentialName?: string;
+  RelyingPartyId?: string;
+  CreatedAt: number;
+}
+
+export async function listPasskeys(): Promise<Passkey[]> {
+  const r = await cognito("ListWebAuthnCredentials", { AccessToken: (await freshTokens()).accessToken });
+  return r.Credentials ?? [];
+}
+
 let refreshing: Promise<Tokens> | null = null;
 
 /** Valid tokens, refreshing if within 5 minutes of expiry. */
@@ -118,6 +189,8 @@ export async function freshTokens(): Promise<Tokens> {
 
 export async function signOut() {
   const t = tokens;
+  // A device-wide flag that would mislead the next Member on a shared device.
+  localStorage.removeItem(HAS_PASSKEY);
   save(null);
   if (t) await cognito("RevokeToken", { Token: t.refreshToken, ClientId: getConfig().clientId }).catch(() => {});
 }
