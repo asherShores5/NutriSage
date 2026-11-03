@@ -23,7 +23,7 @@ export const DEPLOY_ENVIRONMENT = "production";
 export const DEPLOY_ROLE_NAME = "nutrisage-github-deploy";
 
 interface CiStackProps extends StackProps {
-  /** Numeric repo ID (`gh api repos/asherShores5/NutriSageAI --jq .id`); GitHub Actions sets GITHUB_REPOSITORY_ID. */
+  /** Numeric repo ID (`gh api repos/asherShores5/NutriSage --jq .id`); GitHub Actions sets GITHUB_REPOSITORY_ID. */
   githubRepoId: string;
 }
 
