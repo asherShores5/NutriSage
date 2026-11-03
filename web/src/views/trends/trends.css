@@ -1,0 +1,38 @@
+/* Trends tab. The chart scales to the card width (viewBox), colored from the theme variables. */
+.trends .card-head { align-items: center; gap: 0.75rem; }
+.trend-card { justify-items: stretch; }
+.trend-chart { width: 100%; height: auto; display: block; }
+.trend-axis { stroke: var(--border); stroke-width: 1; }
+.trend-line { fill: none; stroke: var(--bar); stroke-width: 2.5; stroke-linecap: round; }
+/* Bridged across no-data Days: dashed and lighter, so the gap stays visible. */
+.trend-bridge { stroke-dasharray: 2 7; stroke-width: 2; opacity: 0.6; }
+/* Today, in progress: a faded segment and a hollow dot. */
+.trend-line.trend-today { opacity: 0.45; }
+.trend-dot { fill: var(--bar); }
+.trend-dot.trend-today { fill: var(--surface); stroke: var(--bar); stroke-width: 2; }
+.trend-label { fill: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.trend-legend { margin: 0; }
+/* Goal line: dashed, in the accent color, under the data. */
+.trend-goal line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 6 5; opacity: 0.8; }
+.trend-goal text { fill: var(--accent); }
+/* Y-axis control row (one per series). */
+.y-axis { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+.y-axis label { display: inline-flex; align-items: center; gap: 0.35rem; }
+.y-axis input[type="number"] { width: 5.5rem; }
+.y-axis-hint { flex-basis: 100%; margin: 0; }
+/* Range row (TrendRangeControls): presets as toggle buttons, then the custom start and end. */
+.trend-range { display: grid; gap: 0.5rem; }
+.trend-presets { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.trend-presets button { height: var(--control); min-width: 2.8rem; padding: 0 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-variant-numeric: tabular-nums; }
+.trend-presets button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.trend-custom { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
+.trend-custom label { display: flex; gap: 0.4rem; align-items: center; }
+.trend-range-error { margin: 0; flex-basis: 100%; }
+/* Second metric (23): its own color (--series2, contrast >= 4:1 on the card in light and dark) and square dots. */
+.trend-second { --bar: var(--series2); }
+.trend-overlay .trend-label-primary { fill: var(--bar); }
+.trend-second .trend-label { fill: var(--series2); }
+.trend-second-pick { display: inline-flex; align-items: center; gap: 0.35rem; }
+.trend-key { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0; padding: 0; list-style: none; font-size: 0.85rem; color: var(--muted); }
+.trend-key li { display: inline-flex; align-items: center; gap: 0.4rem; }
+.trend-swatch { width: 1.1rem; height: 0.3rem; border-radius: 2px; background: var(--bar); }

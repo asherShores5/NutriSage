@@ -1,0 +1,37 @@
+/* Recipe builder (ticket 17): a screen of its own over Today. */
+.recipe-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 0.45); overflow-y: auto; padding: 1rem 0.75rem calc(1rem + env(safe-area-inset-bottom)); }
+.recipe-builder { max-width: 40rem; margin: 0 auto; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem; display: grid; gap: 0.75rem; }
+.recipe-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.recipe-head h2 { margin: 0; }
+.recipe-field { display: grid; gap: 0.25rem; font-size: 0.85rem; color: var(--muted); }
+.recipe-field input { width: 100%; }
+.recipe-field small { font-size: 0.78rem; }
+.recipe-add { display: grid; gap: 0.5rem; }
+.recipe-add-row { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; }
+.recipe-ingredients { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.recipe-ingredients li { display: grid; gap: 0.4rem; padding: 0.6rem 0.75rem; }
+.recipe-ingredients li + li { border-top: 1px solid var(--border); }
+.recipe-ingredient-head { display: flex; align-items: baseline; gap: 0.75rem; }
+.recipe-ingredient-head .entry-name { flex: 1; }
+.recipe-builder .link { background: none; border: 0; padding: 0; height: auto; color: var(--accent); }
+.recipe-builder .danger-link { color: var(--danger); }
+.recipe-yield { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; font-size: 0.85rem; color: var(--muted); }
+.recipe-yield label { display: flex; align-items: center; gap: 0.35rem; }
+.recipe-yield input { width: 4.5rem; }
+.recipe-yield small { font-size: 0.78rem; }
+.prepared-note[data-source="estimated"] { color: var(--accent); }
+.recipe-totals { margin: 0; display: grid; gap: 0.15rem; font-variant-numeric: tabular-nums; }
+.recipe-totals span { color: var(--muted); font-size: 0.8rem; }
+.recipe-portion { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.recipe-portion-head { width: 100%; font-size: 0.85rem; color: var(--muted); }
+.recipe-save { display: flex; gap: 0.5rem; align-items: center; }
+.recipe-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.recipe-actions .danger { margin-right: auto; }
+
+/* A Recipe Entry's breakdown, in the Entry editor. */
+.entry-ingredients h4 { margin: 0 0 0.3rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.meal-group .entry-ingredients ul { list-style: none; margin: 0; padding: 0; background: none; border: 0; border-radius: 0; display: grid; gap: 0.2rem; font-size: 0.85rem; }
+.entry-ingredients li { display: flex; gap: 0.5rem; }
+.entry-ingredients li span:first-child { flex: 1; overflow-wrap: anywhere; }
+.entry-ingredients li span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.entry-ingredients li span:first-child { color: inherit; }

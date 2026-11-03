@@ -1,0 +1,22 @@
+/* Library screen (opened from Profile). */
+.library-head { display: flex; align-items: baseline; gap: 0.75rem; }
+.library-head h2 { margin: 0; }
+.library > input[type="search"] { width: 100%; margin: 0.75rem 0 0.25rem; }
+.library-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
+.library-list li { display: flex; align-items: center; gap: 0.25rem; }
+.library-list button.library-open { flex: 1; min-width: 0; display: flex; height: auto; min-height: 2.75rem; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.55rem 0.8rem; text-align: left; background: var(--surface); }
+.library-list .library-name { overflow-wrap: anywhere; }
+.library-list small { color: var(--muted); white-space: nowrap; }
+.food-editor { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem; }
+.food-editor .wide, .food-editor fieldset { grid-column: 1 / -1; }
+.food-editor label { display: grid; gap: 0.2rem; font-size: 0.85rem; }
+.food-editor label small { color: var(--muted); }
+.food-editor input { width: 100%; min-width: 0; }
+.food-editor fieldset { display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: 0.6rem; margin: 0; padding: 0.75rem 1rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.food-editor legend { padding: 0 0.3rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.food-editor .food-units { grid-template-columns: 1fr; }
+.food-unit { display: grid; grid-template-columns: 1fr 5.5rem auto; gap: 0.5rem; }
+.food-units .link { justify-self: start; }
+.food-editor-actions { display: flex; gap: 0.6rem; justify-content: flex-end; }
+.food-editor-actions .danger { margin-right: auto; }
+.library-section { margin: 1.25rem 0 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }

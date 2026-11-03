@@ -1,0 +1,262 @@
+// Trend series for the Trends tab (spec: Trend series). A pure function from Days, a metric and a
+// date range to points; the chart only draws them. Unlogged Days are no data (never 0), segments
+// across them are bridged, and today is in progress (ticket 20). Long ranges are weekly averages
+// via TrendOptions.bucket (21); manual Y bounds and a goal line via YMode/trendBounds/trendGoal (22).
+// A second metric overlays on its own right-hand axis with its own bounds (trendOverlay, 23).
+import { isDateKey, type Day } from "./day";
+import type { Goals } from "./goals";
+import { NUTRIENTS, num, sumMacros, type NutrientKey } from "./nutrients";
+import { datesBetween, isLogged, lastDays, type DayLike, type DaysByDate } from "./week";
+
+export type TrendMetric = NutrientKey | "weight" | "water";
+
+export interface TrendMetricInfo {
+  key: TrendMetric;
+  label: string;
+  unit: string;
+}
+
+const nutrient = (k: NutrientKey): TrendMetricInfo => {
+  const n = NUTRIENTS.find((x) => x.key === k)!;
+  return { key: n.key, label: n.label, unit: n.unit };
+};
+
+/** The metrics Trends can chart, in picker order (the old app's). */
+export const TREND_METRICS: readonly TrendMetricInfo[] = [
+  nutrient("calories"),
+  { key: "weight", label: "Weight", unit: "" },
+  { key: "water", label: "Water", unit: "cups" },
+  ...(["carbs", "protein", "fat", "fiber", "sodium", "iron"] as const).map(nutrient),
+];
+
+/** What a trend reads from a Day: its Entries, water and weight. */
+export type TrendDay = DayLike & Partial<Pick<Day, "water" | "weight">>;
+
+/** One date's (or one weekly bucket's) value; null = no data (the line bridges it with a dashed segment). */
+export interface TrendPoint {
+  /** The Day, or a weekly bucket's first Day. */
+  date: string;
+  /** A weekly bucket's last Day (absent on daily points). */
+  end?: string;
+  value: number | null;
+  /** Today, still being logged: drawn so a half-logged Day doesn't read as a bad one. */
+  inProgress: boolean;
+}
+
+/** Inclusive YYYY-MM-DD range. */
+export interface TrendRange {
+  from: string;
+  to: string;
+}
+
+/**
+ * One Day's value for a metric, or null when that Day has no data for it (an unlogged Day is
+ * never 0, so lines don't dive to the floor). A nutrient needs at least one Entry and is the
+ * Day's rounded total. Water is cups on a Day with water or Entries (a logged Day with no water
+ * is a real 0). Weight needs a value > 0 (the old app wrote 0 for "not logged").
+ */
+export function trendValue(day: TrendDay | null | undefined, metric: TrendMetric): number | null {
+  if (metric === "weight") return num(day?.weight) > 0 ? num(day?.weight) : null;
+  if (metric === "water") return num(day?.water) > 0 || isLogged(day) ? num(day?.water) : null;
+  return isLogged(day) ? Math.round(sumMacros(day?.entries)[metric]) : null;
+}
+
+/** One point per Day, or per 7 Days (weekly averages, for long ranges: see trendBucket). */
+export type TrendBucket = "day" | "week";
+
+/** How a series is built. */
+export interface TrendOptions {
+  /** Today's YYYY-MM-DD; its point (or the weekly bucket holding it) is flagged in progress. */
+  today?: string;
+  /** Default "day". */
+  bucket?: TrendBucket;
+}
+
+/**
+ * Points for `range`, oldest first: one per date, or with bucket "week" one per 7 Days counted
+ * back from `range.to` (so the newest bucket ends at the range's end; the oldest may be shorter).
+ * A weekly point averages the Days with data in it (unlogged Days are never counted as 0), to one
+ * decimal, and is null when none has data.
+ */
+export function trendSeries(days: DaysByDate<TrendDay>, metric: TrendMetric, range: TrendRange, opts: TrendOptions = {}): TrendPoint[] {
+  const dates = datesBetween(range.from, range.to);
+  const daily = dates.map((date) => ({ date, value: trendValue(days[date], metric), inProgress: date === opts.today }));
+  if (opts.bucket !== "week") return daily;
+  const out: TrendPoint[] = [];
+  for (let end = daily.length; end > 0; end -= 7) {
+    const chunk = daily.slice(Math.max(0, end - 7), end);
+    const vals = chunk.map((p) => p.value).filter((v): v is number => v !== null);
+    out.unshift({
+      date: chunk[0].date,
+      end: chunk[chunk.length - 1].date,
+      value: vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null,
+      inProgress: chunk.some((p) => p.inProgress),
+    });
+  }
+  return out;
+}
+
+/** Ranges longer than this many Days plot weekly averages (spec: "over about 90 days"). */
+export const TREND_DAILY_MAX = 90;
+
+/** Daily up to TREND_DAILY_MAX Days, weekly beyond (a year stays readable). */
+export function trendBucket(range: TrendRange): TrendBucket {
+  return datesBetween(range.from, range.to).length > TREND_DAILY_MAX ? "week" : "day";
+}
+
+export type TrendPreset = "7d" | "30d" | "90d" | "1y" | "all";
+
+/** The range presets, in control order. `days` is the length ending today (All has none). */
+export const TREND_PRESETS: readonly { key: TrendPreset; label: string; days?: number }[] = [
+  { key: "7d", label: "Last 7 days", days: 7 },
+  { key: "30d", label: "Last 30 days", days: 30 },
+  { key: "90d", label: "Last 90 days", days: 90 },
+  { key: "1y", label: "Last year", days: 365 },
+  { key: "all", label: "All time" },
+];
+
+/** Where an All query starts: before any Day could be logged, so one range query returns them all. */
+export const TREND_ALL_FROM = "2000-01-01";
+
+/**
+ * A preset's range, ending today. All starts at `firstDay` (the oldest Day returned by a query
+ * from TREND_ALL_FROM), or is just today when nothing is logged.
+ */
+export function presetRange(preset: TrendPreset, today: string, firstDay?: string): TrendRange {
+  const n = TREND_PRESETS.find((p) => p.key === preset)?.days;
+  if (n) return { from: lastDays(today, n)[0], to: today };
+  return { from: firstDay && firstDay < today ? firstDay : today, to: today };
+}
+
+/** A custom start and end (YYYY-MM-DD, from date inputs), or why it can't be used. */
+export function customRange(from: string, to: string, today: string): TrendRange | { error: string } {
+  if (!isDateKey(from) || !isDateKey(to)) return { error: "Pick a start and an end." };
+  if (from > to) return { error: "Start must be on or before end." };
+  if (to > today) return { error: "End can't be after today." };
+  return { from, to };
+}
+
+/** A line segment between two points with data (indexes into the series). */
+export interface TrendSegment {
+  from: number;
+  to: number;
+  /** Crosses one or more no-data Days: drawn dashed so the gap stays visible. */
+  bridged: boolean;
+  /** Ends at today's in-progress point. */
+  inProgress: boolean;
+}
+
+/** The line through a series: each point with data joins the next one with data. Works for any series (the second metric too). */
+export function trendSegments(points: readonly TrendPoint[]): TrendSegment[] {
+  const out: TrendSegment[] = [];
+  let prev = -1;
+  points.forEach((p, i) => {
+    if (p.value === null) return;
+    if (prev >= 0) out.push({ from: prev, to: i, bridged: i - prev > 1, inProgress: p.inProgress });
+    prev = i;
+  });
+  return out;
+}
+
+/** How a series' Y-axis is scaled: fit to the data's min..max, from 0, or the Member's own min and max. */
+export type YMode = "fit" | "zero" | "manual";
+
+export interface YBounds {
+  min: number;
+  max: number;
+}
+
+/** A manual min/max as typed; a blank side (null) falls back to the zero-mode bound. */
+export interface ManualBounds {
+  min: number | null;
+  max: number | null;
+}
+
+/** What one series' bounds depend on besides its points (each series passes its own). */
+export interface BoundsOptions {
+  /** Used in manual mode. */
+  manual?: ManualBounds;
+  /** The series' goal line (see trendGoal). Zero and fit bounds stretch to keep it on screen. */
+  goal?: number | null;
+}
+
+/** Where the goal line goes for a metric: the Member's goal, the water goal for water, none for weight. A goal of 0 is "no goal". */
+export function trendGoal(goals: Goals | undefined, metric: TrendMetric): number | null {
+  if (!goals || metric === "weight") return null;
+  const g = num(goals[metric]);
+  return g > 0 ? g : null;
+}
+
+/** The old chart's default: weight zooms to its range, everything else starts at 0. */
+export function defaultYMode(metric: TrendMetric): YMode {
+  return metric === "weight" ? "fit" : "zero";
+}
+
+/**
+ * Y-axis bounds for one series. The max is at least 1 so a flat-zero line still has an axis. Fit
+ * mode leaves out today's in-progress point (unless nothing else has data); it's still drawn,
+ * clipped at the plot edge if it falls outside.
+ */
+export function trendBounds(points: readonly TrendPoint[], mode: YMode, opts: BoundsOptions = {}): YBounds {
+  const auto = autoBounds(points, mode === "fit", opts.goal ?? null);
+  if (mode !== "manual" || !opts.manual) return auto;
+  const out = { min: opts.manual.min ?? auto.min, max: opts.manual.max ?? auto.max };
+  return manualBoundsValid(out) ? out : auto;
+}
+
+/** A manual min/max the chart can use: both finite and min below max. */
+const manualBoundsValid = (b: YBounds) => Number.isFinite(b.min) && Number.isFinite(b.max) && b.min < b.max;
+
+function autoBounds(points: readonly TrendPoint[], fit: boolean, goal: number | null): YBounds {
+  // Fit to the finished Days: today's half-logged point would drag the axis down (it's still drawn).
+  const done = fit ? points.filter((p) => !p.inProgress && p.value !== null) : [];
+  const vals = (done.length ? done : points).map((p) => p.value).filter((v): v is number => v !== null);
+  const all = goal === null ? vals : [...vals, goal];
+  if (!all.length) return { min: 0, max: 1 };
+  return { min: fit && vals.length ? Math.min(...all) : 0, max: Math.max(1, ...all) };
+}
+
+/** The caption's numbers: points with data, and the highest of them (null with none). */
+export function trendSummary(points: readonly TrendPoint[]): { logged: number; max: number | null } {
+  const present = points.map((p) => p.value).filter((v): v is number => v !== null);
+  return { logged: present.length, max: present.length ? Math.max(...present) : null };
+}
+
+/** How one series of the chart is built: its metric, Y mode, manual bounds and (primary only) goal line. */
+export interface TrendLineSpec {
+  metric: TrendMetric;
+  mode: YMode;
+  manual?: ManualBounds;
+  /** The goal line, drawn for the primary metric only (a second spec's goal is ignored). */
+  goal?: number | null;
+}
+
+/** One drawn series: its points and the bounds of its own axis. */
+export interface TrendLine {
+  metric: TrendMetric;
+  points: TrendPoint[];
+  bounds: YBounds;
+}
+
+/**
+ * The chart's series: the primary metric on the left axis and an optional second metric on a
+ * right-hand axis. Both follow the same range and bucket; each gets its own bounds from its own
+ * mode (and manual min/max). The goal line belongs to the primary metric, so only it stretches
+ * the primary axis. No second metric, or the same one twice, is no overlay.
+ */
+export function trendOverlay(
+  days: DaysByDate<TrendDay>,
+  range: TrendRange,
+  opts: TrendOptions,
+  primary: TrendLineSpec,
+  second?: TrendLineSpec | null,
+): { primary: TrendLine; second: TrendLine | null } {
+  const line = (s: TrendLineSpec, goal: number | null): TrendLine => {
+    const points = trendSeries(days, s.metric, range, opts);
+    return { metric: s.metric, points, bounds: trendBounds(points, s.mode, { manual: s.manual, goal }) };
+  };
+  return {
+    primary: line(primary, primary.goal ?? null),
+    second: second && second.metric !== primary.metric ? line(second, null) : null,
+  };
+}

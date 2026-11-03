@@ -1,0 +1,132 @@
+# The shared Library: Foods and Recipes (tickets 12, 15, 17, 18, 19). Resolvers: api/src/resolvers/library.ts.
+# Shared by every Member (HOUSEHOLD partition); Guests never reach it.
+
+"A named unit of a Food and the gram weight of one of it (serving, g, egg, cup...)."
+type FoodUnit {
+  label: String!
+  grams: Float!
+}
+
+"A single Library item with known nutrition per unit (shared/src/food.ts)."
+type Food {
+  id: ID!
+  name: String!
+  "Nutrition in one gram; in one serving when the Food has no g unit (its serving weight is unknown)."
+  nutrition: Nutrition!
+  "serving first, then g when weighed, then any others."
+  units: [FoodUnit!]!
+  yieldRatio: Float
+  "Username of the Member who first saved it."
+  createdBy: String!
+  "Epoch ms of the last write."
+  updatedAt: Float!
+}
+
+"One ingredient of a Recipe: an amount of a Food, snapshotted when it was added (shared/src/recipe.ts)."
+type RecipeIngredient {
+  "The Library item it came from, if any."
+  libraryId: ID
+  name: String!
+  amount: Float!
+  unit: String!
+  "Raw grams that went in, when known."
+  grams: Float
+  "Nutrition of that amount."
+  nutrition: Nutrition!
+  yieldRatio: Float
+  "Set when this ingredient is a portion of a saved Recipe (libraryId is its id): that portion's breakdown. Recipes nest one level deep, so these are Foods."
+  ingredients: [NestedIngredient!]
+}
+
+"One ingredient of a saved Recipe used inside another Recipe. Never a Recipe itself (one level deep)."
+type NestedIngredient {
+  libraryId: ID
+  name: String!
+  amount: Float!
+  unit: String!
+  grams: Float
+  nutrition: Nutrition!
+  yieldRatio: Float
+}
+
+"A Recipe in the Recipe Book: ingredients plus an optional weighed Prepared weight."
+type Recipe {
+  id: ID!
+  name: String!
+  ingredients: [RecipeIngredient!]!
+  "Weighed Prepared weight of the finished batch in grams; null when not weighed."
+  preparedGrams: Float
+  createdBy: String!
+  updatedAt: Float!
+}
+
+"The household's whole Library: Foods and the Recipe Book."
+type Library {
+  foods: [Food!]!
+  recipes: [Recipe!]!
+}
+
+extend type Query {
+  "The shared Library: the same for every Member."
+  library: Library!
+}
+
+input FoodUnitInput {
+  label: String!
+  grams: Float!
+}
+
+"A Food's editable parts, as the Library edit form holds them (shared/src/foodEdit.ts). Nutrition is per serving; it is stored per gram."
+input FoodEditInput {
+  name: String!
+  "Nutrition in one serving."
+  nutrition: NutritionInput!
+  "Grams in one serving, or null when unknown (then the Food has no g or other units)."
+  servingGrams: Float
+  "Units other than serving and g."
+  units: [FoodUnitInput!]!
+  yieldRatio: Float
+}
+
+input RecipeIngredientInput {
+  libraryId: ID
+  name: String!
+  amount: Float!
+  unit: String!
+  grams: Float
+  nutrition: NutritionInput!
+  yieldRatio: Float
+  "A portion of a saved Recipe: its breakdown (see RecipeIngredient.ingredients)."
+  ingredients: [NestedIngredientInput!]
+}
+
+input NestedIngredientInput {
+  libraryId: ID
+  name: String!
+  amount: Float!
+  unit: String!
+  grams: Float
+  nutrition: NutritionInput!
+  yieldRatio: Float
+}
+
+input RecipeInput {
+  name: String!
+  ingredients: [RecipeIngredientInput!]!
+  preparedGrams: Float
+}
+
+extend type Mutation {
+  "Save a new Recipe to the Recipe Book under a client-chosen id. Saving an id that's already there returns that Recipe unchanged."
+  addRecipe(id: ID!, input: RecipeInput!): Recipe!
+  "Edit a saved Recipe (either Member may): ingredients, name, Prepared weight. Entries logged from it keep their own snapshot."
+  putRecipe(id: ID!, input: RecipeInput!): Recipe!
+  "Delete a saved Recipe and every Member's Favorite of it. Entries and other Recipes using it are untouched. Returns the id."
+  deleteRecipe(id: ID!): ID!
+  "Edit a Library Food (either Member may). Entries logged from it keep their own snapshot."
+  putFood(id: ID!, input: FoodEditInput!): Food!
+  "Ask Bedrock for the Yield ratio of a Library Food that has none and save it on the Food. A Food with a ratio, or a reply with no believable one, comes back unchanged."
+  suggestYieldRatio(id: ID!): Food!
+  "Delete a Library Food and every Member's Favorite of it. Entries logged from it are untouched. Returns the id."
+  deleteFood(id: ID!): ID!
+}

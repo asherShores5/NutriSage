@@ -1,0 +1,22 @@
+# Bedrock nutrition estimates (api/src/resolvers/estimate.ts; the core is api/src/estimate.ts).
+
+"What Bedrock thinks one serving of a typed Food holds. Junk numbers in the model's reply become 0."
+type Estimate {
+  "The food text as estimated (trimmed, at most 200 characters)."
+  name: String!
+  "For the serving named in the text, or one typical serving (for the whole amount when asked with amount and unit)."
+  nutrition: Nutrition!
+  "Gram weight of that serving, or null when the model gave no believable one."
+  servingGrams: Float
+  "Raw-to-prepared weight ratio; only when asked with ingredient: true."
+  yieldRatio: Float
+  "Other common units Bedrock suggests (egg, cup, slice...) with the gram weight of one. May be empty."
+  units: [FoodUnit!]!
+  "The Library Food this was saved as (or the existing one with the same name). Null for an all-zero estimate or a full Library, and always from the Guest endpoint."
+  food: Food
+}
+
+extend type Mutation {
+  "Estimate one serving of `text` (e.g. \"2 eggs scrambled\") and save it to the shared Library. Set ingredient for a Recipe ingredient's Yield ratio. With amount and unit (one of the add box's units for a new Food, other than serving), estimate exactly that amount; the saved Food gets that unit."
+  estimate(text: String!, ingredient: Boolean, amount: Float, unit: String): Estimate!
+}

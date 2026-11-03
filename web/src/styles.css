@@ -1,0 +1,96 @@
+/* App-wide base styles and theme variables. Tab-specific styles live next to each tab (views/<tab>/). */
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --bg: #f4f6f3;
+  --surface: #ffffff;
+  --text: #17201a;
+  --muted: #5f6b63;
+  --border: #dfe5df;
+  --accent: #2f8f5b;
+  --danger: #c0392b;
+  --track: #e6ebe6;
+  --bar: #5b7bd5;
+  --series2: #c2610c;
+  --good: #2e9e5b;
+  --spill: #d98a1f;
+  --spill-text: #a8680f;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --control: 2.6rem;
+  --tabbar: 3.5rem;
+}
+/* Dark: forced by html[data-theme="dark"] (Profile > Theme), or the OS setting unless forced light. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121614; --surface: #1b211e; --text: #e6ece8; --muted: #97a39b; --border: #2c3530;
+  --accent: #4cc283; --danger: #ef6b5b; --track: #2c3530; --bar: #7d98ec; --series2: #f0a04b; --good: #46c072;
+  --spill: #e6a84a; --spill-text: #e6a84a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121614; --surface: #1b211e; --text: #e6ece8; --muted: #97a39b; --border: #2c3530;
+    --accent: #4cc283; --danger: #ef6b5b; --track: #2c3530; --bar: #7d98ec; --series2: #f0a04b; --good: #46c072;
+    --spill: #e6a84a; --spill-text: #e6a84a;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+main, .login {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) calc(var(--tabbar) + 1.5rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+h1 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 0; }
+h2 { font-size: 1.4rem; letter-spacing: -0.01em; margin: 0 0 0.25rem; }
+.error { color: var(--danger); margin: 0.5rem 0; }
+.empty { color: var(--muted); }
+.center { display: grid; place-items: center; min-height: 60vh; color: var(--muted); }
+
+input, select, button { font: inherit; color: inherit; }
+input, select {
+  height: var(--control);
+  padding: 0 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  min-width: 0;
+}
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button {
+  height: var(--control);
+  padding: 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+}
+button:disabled { cursor: default; opacity: 0.45; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+.login { display: grid; gap: 0.75rem; max-width: 22rem; padding-top: 18vh; }
+.hint { color: var(--muted); font-size: 0.85rem; margin: 0; }
+.leave-guest { margin-top: 1rem; }
+.guest-entry { display: grid; gap: 0.5rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.guest-banner {
+  margin: 0; padding: calc(0.4rem + env(safe-area-inset-top)) 1rem 0.4rem; text-align: center;
+  font-size: 0.85rem; color: var(--muted); background: var(--surface); border-bottom: 1px solid var(--border);
+}
+button.link { height: auto; padding: 0.35rem 0; border: 0; background: none; color: var(--accent); }
+.card { display: grid; gap: 0.6rem; justify-items: start; padding: 1rem; margin: 1rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.card h3 { margin: 0; font-size: 1.05rem; }
+.card p { margin: 0; }
+
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface); border-top: 1px solid var(--border);
+}
+.tabbar button { height: var(--tabbar); border: 0; border-radius: 0; background: none; color: var(--muted); font-size: 0.85rem; }
+.tabbar button[aria-current="page"] { color: var(--accent); font-weight: 600; }
+
+/* "Recipe" beside a Library item's name (search matches, Quick Add, the builder, the Library screen). */
+.item-kind { color: var(--muted); font-size: 0.75em; font-weight: normal; }

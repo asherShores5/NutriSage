@@ -1,0 +1,41 @@
+# Browser checks (fake backend)
+
+Headless Chromium (iPhone 13 profile, Pacific time) runs the built app with every network call
+routed in-process: the real API handler on the in-memory table (`api/src/testing/fakeDynamo.ts`)
+behind a GraphQL executor built from the composed `schema/*.graphql`, and a fake Cognito
+(password `e2e-password`). Members are `asher` and `aubyn`. Nothing touches AWS. Copied from
+Honey Do's e2e harness.
+
+Not a workspace, so CI never installs it.
+
+    npm run build:web          # repo root
+    cd e2e && npm install && npx playwright install chromium
+    npx tsx today.ts           # walking skeleton: sign in, log an Entry, totals, persistence
+    npx tsx parity.ts          # Today parity: Goals, every Meal incl. Dessert, bars, water, weight, theme
+    npx tsx move.ts            # move an Entry to another Meal and Day, delete one; Day navigation, Clear day
+    npx tsx estimate.ts        # type a Food, log the (stubbed) Bedrock estimate
+    npx tsx offline.ts         # log offline, reload offline (service worker), sync back; phone -> desktop on focus
+    npx tsx amounts.ts         # amounts (1 1/2, 1/3), unit picker, quick picks, rescaling in the editor
+    npx tsx favorites.ts       # star from Entries, Quick Add newest first, logging bumps to the top; per Member; Guest on device
+    npx tsx library.ts         # an estimate joins the shared Library; the other Member logs it by amount x unit
+    npx tsx search.ts          # fuzzy search in the add box: 'chik brst', typos, arrow keys, nonsense + Enter estimates, Guest Library
+    npx tsx recipes.ts         # Recipe builder: 3 ingredients (one estimated), live totals, log 350 g, expand the breakdown; 1/4 batch unsaved
+    npx tsx yieldRatios.ts     # unweighed Recipe: Prepared weight estimated from (Bedrock-suggested) Yield ratios; edit one, it's saved on the Food; log in g
+    npx tsx recipeBook.ts      # Recipe Book: save, find in search, star, Quick Add 1/4 batch, nest one level, edit in Library, delete
+    npx tsx week.ts            # Week streak/averages/total vs seeded Days; Trends metric chart
+    npx tsx trends.ts          # Trends gaps: no data on unlogged Days, dashed bridges, today in progress
+    npx tsx trendsYAxis.ts     # Trends Y-axis: fit, from 0, manual min/max; goal line (water goal; none for weight)
+    npx tsx trendsRange.ts     # Trends range: presets, custom start/end, weekly averages over ~90 days, one query each
+    npx tsx trendsSecond.ts    # Trends second metric: right-hand axis with its own bounds, color and legend; goal stays primary
+    npx tsx guest.ts           # Guest mode: demo data, capped estimates (cap 2 here), leave Guest mode
+    npx tsx passkeys.ts        # add a passkey, sign in with it (virtual authenticator), password backup
+    npx tsx mealWindows.ts     # Meal windows (faked clock): guess on open, a pick sticks, rollover, Profile edit
+    npx tsx tour.ts            # screenshots of every tab: phone, desktop, dark
+
+Screenshots go to `/tmp/e2e-nutrisage-<checkout folder>/` (override with `E2E_OUT`), so parallel
+worktrees don't overwrite each other. Add a new check script per feature area (e.g. `week.ts`)
+using `checklist()` from `lib.ts`, and add its screens to `tour.ts`.
+
+Not covered: real device passkeys (Face ID, iCloud Keychain, phone QR; `passkeys.ts` uses a
+Chromium virtual authenticator), iOS install quirks. Service workers are blocked unless a check
+opts in (`offline.ts` does).

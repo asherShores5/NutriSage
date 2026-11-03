@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<!-- NutriSage moved (ticket 16). Served by GitHub Pages at the OLD address
+     ashershores5.github.io/NutriSageAI/ as index.html, docs/index.html and 404.html, so old
+     bookmarks and the old home-screen app land on the new site. See docs/cutover-runbook.md. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>NutriSage has moved</title>
+  <link rel="canonical" href="https://nutrisage.ashershores.com/">
+  <meta http-equiv="refresh" content="3; url=https://nutrisage.ashershores.com/">
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 30rem; margin: 20vh auto; padding: 0 1rem; text-align: center; line-height: 1.5; }
+    a { font-weight: 600; }
+    @media (prefers-color-scheme: dark) { body { background: #111; color: #eee; } a { color: #8cf; } }
+  </style>
+</head>
+<body>
+  <h1>NutriSage has moved</h1>
+  <p>Your history came with it. Go to <a href="https://nutrisage.ashershores.com/">nutrisage.ashershores.com</a>
+    and sign in there. On iPhone, add the new site to your Home Screen and delete this old icon.</p>
+  <script>
+    // Drop the old app's service worker and caches so it stops serving the old app offline, then go.
+    (function () {
+      var go = function () { location.replace("https://nutrisage.ashershores.com/"); };
+      var jobs = [];
+      try {
+        if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+        if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+      } catch (e) {}
+      Promise.all(jobs).then(go, go);
+      setTimeout(go, 1500);
+    })();
+  </script>
+</body>
+</html>
