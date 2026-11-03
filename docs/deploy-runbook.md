@@ -41,7 +41,7 @@ export CDK_DEFAULT_ACCOUNT=$(aws sts get-caller-identity --query Account --outpu
 export HOSTED_ZONE_NAME=ashershores.com
 export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$HOSTED_ZONE_NAME" \
   --max-items 1 --query 'HostedZones[0].Id' --output text | sed 's#/hostedzone/##')
-export REPO_ID=$(gh api repos/asherShores5/NutriSageAI --jq .id)
+export REPO_ID=$(gh api repos/asherShores5/NutriSage --jq .id)
 echo "zone=$HOSTED_ZONE_ID repo=$REPO_ID"
 ```
 

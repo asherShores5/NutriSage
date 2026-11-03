@@ -4,10 +4,10 @@ A nutrition tracker for one household. Each Member logs what they eat and drink 
 their own goals, drawing on a shared Library of Foods and Recipes. Terms are in
 [GLOSSARY.md](GLOSSARY.md); the plan is [docs/specs/2026-11-02-v1.md](docs/specs/2026-11-02-v1.md).
 
-NutriSage is being rebuilt on the same stack as my other apps (TypeScript, React PWA, AppSync +
-Lambda, DynamoDB, Cognito, CDK) for nutrisage.ashershores.com. Until cutover, the old plain-JS app
-in [docs/](docs/) and its Python backend in [backend/](backend/) stay live at
-[ashershores5.github.io/NutriSageAI](https://ashershores5.github.io/NutriSageAI).
+NutriSage runs on the same stack as my other apps (TypeScript, React PWA, AppSync + Lambda,
+DynamoDB, Cognito, CDK) at https://nutrisage.ashershores.com. The old plain-JS app in [docs/](docs/)
+and its Python backend in [backend/](backend/) are retired; the old Pages address redirects to the new
+site. They are removed from the repo with ticket 24.
 
 ## Layout
 
