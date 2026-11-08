@@ -2,7 +2,7 @@
 // table and a stubbed Bedrock, behind a GraphQL executor built from the composed schema/*.graphql, plus just enough
 // Cognito for the web app to sign in. Nothing here talks to AWS.
 import { buildSchema, defaultFieldResolver, execute, parse, type GraphQLFieldResolver } from "graphql";
-import { composeSchemaDir } from "../schema/compose";
+import { QUERY_DEPTH_LIMIT, composeSchemaDir, queryDepth } from "../schema/compose";
 
 export interface Member {
   userId: string;
@@ -50,6 +50,9 @@ export function memberForToken(token: string | undefined): Member | undefined {
 export async function graphql(token: string | undefined, query: string, variables: Record<string, unknown> = {}) {
   const member = memberForToken(token);
   if (!member) return { errors: [{ message: "Unauthorized", errorType: "UnauthorizedException" }] };
+  // AppSync's cap (infra/lib/stacks.ts). Live it nulls the fields past the cap; failing loudly here is what
+  // catches a selection that grew too deep.
+  if (queryDepth(query) > QUERY_DEPTH_LIMIT) return { errors: [{ message: `Query depth limit reached. (${queryDepth(query)} > ${QUERY_DEPTH_LIMIT})` }] };
   const fieldResolver: GraphQLFieldResolver<unknown, unknown> = async (src, args, ctx, info) => {
     const parent = info.parentType.name;
     if (parent !== "Query" && parent !== "Mutation") return defaultFieldResolver(src, args, ctx, info);

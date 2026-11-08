@@ -6,7 +6,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import * as path from "node:path";
 import {
   Kind, parse, print,
-  type DefinitionNode, type FieldDefinitionNode, type ObjectTypeDefinitionNode,
+  type DefinitionNode, type FieldDefinitionNode, type ObjectTypeDefinitionNode, type SelectionSetNode,
 } from "graphql";
 
 export const SCHEMA_DIR = __dirname;
@@ -52,4 +52,30 @@ export function rootFields(sdl: string): { Query: string[]; Mutation: string[] }
     }
   }
   return out;
+}
+
+/**
+ * AppSync's query depth cap (infra sets it, e2e/backend.ts enforces it the same way). The root field is
+ * depth 1 and every field past the cap comes back null, so it must cover the deepest selection the app sends:
+ * `library > recipes > ingredients > ingredients > nutrition > carbs` (a saved Recipe used as an ingredient).
+ */
+export const QUERY_DEPTH_LIMIT = 6;
+
+/** The deepest field in a query, counted the way AppSync does (root field = 1; fragments add no depth). */
+export function queryDepth(query: string): number {
+  const doc = parse(query);
+  const fragments = new Map<string, SelectionSetNode>();
+  for (const d of doc.definitions) if (d.kind === Kind.FRAGMENT_DEFINITION) fragments.set(d.name.value, d.selectionSet);
+  const walk = (set: SelectionSetNode | undefined, depth: number): number => {
+    let max = depth - 1;
+    for (const s of set?.selections ?? []) {
+      if (s.kind === Kind.FIELD) max = Math.max(max, s.selectionSet ? walk(s.selectionSet, depth + 1) : depth);
+      else if (s.kind === Kind.INLINE_FRAGMENT) max = Math.max(max, walk(s.selectionSet, depth));
+      else max = Math.max(max, walk(fragments.get(s.name.value), depth));
+    }
+    return max;
+  };
+  let deepest = 0;
+  for (const d of doc.definitions) if (d.kind === Kind.OPERATION_DEFINITION) deepest = Math.max(deepest, walk(d.selectionSet, 1));
+  return deepest;
 }
