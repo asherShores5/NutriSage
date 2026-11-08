@@ -12,7 +12,7 @@ import {
   aws_logs as logs,
 } from "aws-cdk-lib";
 import type { Construct } from "constructs";
-import { composeSchemaDir, rootFields } from "../../schema/compose";
+import { QUERY_DEPTH_LIMIT, composeSchemaDir, rootFields } from "../../schema/compose";
 import { allowEstimates } from "./estimate";
 import { GuestEstimate } from "./guest";
 
@@ -110,10 +110,10 @@ export class AppStack extends Stack {
       },
       // Errors only, without request/response content (food names, weights).
       logConfig: { fieldLogLevel: appsync.FieldLogLevel.ERROR, excludeVerboseContent: true, retention: logs.RetentionDays.TWO_WEEKS },
-      // The app knows its schema. Every app request is one root field a few levels deep
-      // (days > entries > nutrition), so these caps never bite the app.
+      // The app knows its schema. Every app request is one root field; the depth cap covers the deepest
+      // selection the app sends (see QUERY_DEPTH_LIMIT; e2e/backend.ts refuses anything deeper, as AppSync does).
       introspectionConfig: appsync.IntrospectionConfig.DISABLED,
-      queryDepthLimit: 4,
+      queryDepthLimit: QUERY_DEPTH_LIMIT,
       resolverCountLimit: 2,
     }));
 
