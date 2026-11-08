@@ -1,7 +1,7 @@
 import { App } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { beforeAll, describe, expect, it } from "vitest";
-import { composeSchemaDir, rootFields } from "../../schema/compose";
+import { QUERY_DEPTH_LIMIT, composeSchemaDir, queryDepth, rootFields } from "../../schema/compose";
 import { buildApp } from "../lib/app";
 import { ESTIMATE_MODEL } from "../lib/estimate";
 import { USERNAMES } from "../lib/stacks";
@@ -90,8 +90,17 @@ describe("API", () => {
   it("doesn't describe itself and caps query depth and resolvers per request", () => {
     app.hasResourceProperties("AWS::AppSync::GraphQLApi", { IntrospectionConfig: "DISABLED" });
     const [api] = Object.values(app.findResources("AWS::AppSync::GraphQLApi"));
-    expect(api.Properties.QueryDepthLimit).toBeLessThanOrEqual(5);
+    expect(api.Properties.QueryDepthLimit).toBe(QUERY_DEPTH_LIMIT);
+    expect(QUERY_DEPTH_LIMIT).toBeLessThanOrEqual(6);
     expect(api.Properties.ResolverCountLimit).toBeLessThanOrEqual(5);
+  });
+
+  it("counts query depth the way AppSync does (root field = 1)", () => {
+    expect(queryDepth("query { goals { water } }")).toBe(2);
+    // The error path seen live with the old cap of 4: /library/recipes[0]/ingredients[0]/nutrition/carbs.
+    expect(queryDepth("query { library { recipes { ingredients { nutrition { carbs } } } } }")).toBe(5);
+    expect(queryDepth("query { library { recipes { ingredients { ingredients { nutrition { carbs } } } } } }")).toBe(QUERY_DEPTH_LIMIT);
+    expect(queryDepth("query { a { ... on X { b { c } } } }")).toBe(3);
   });
 
   it("has a Lambda resolver for every Query and Mutation field in schema/", () => {
