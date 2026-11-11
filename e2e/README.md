@@ -29,6 +29,7 @@ Not a workspace, so CI never installs it.
     npx tsx trendsSecond.ts    # Trends second metric: right-hand axis with its own bounds, color and legend; goal stays primary
     npx tsx guest.ts           # Guest mode: demo data, capped estimates (cap 2 here), leave Guest mode
     npx tsx passkeys.ts        # add a passkey, sign in with it (virtual authenticator), password backup
+    npx tsx password.ts        # Profile > Change password: policy + mismatch refused, wrong current password, new one signs in
     npx tsx mealWindows.ts     # Meal windows (faked clock): guess on open, a pick sticks, rollover, Profile edit
     npx tsx tour.ts            # screenshots of every tab: phone, desktop, dark
 

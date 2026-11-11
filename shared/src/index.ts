@@ -11,6 +11,7 @@ export * from "./goals";
 export * from "./guest";
 export * from "./mealWindows";
 export * from "./nutrients";
+export * from "./password";
 export * from "./recipe";
 export * from "./recipeBook";
 export * from "./scaling";
