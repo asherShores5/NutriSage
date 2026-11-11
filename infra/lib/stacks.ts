@@ -65,6 +65,7 @@ export class AppStack extends Stack {
       selfSignUpEnabled: false,
       signInAliases: { username: true },
       signInCaseSensitive: false,
+      // shared/src/password.ts mirrors this for the Profile's Change password form; keep them in step.
       passwordPolicy: { minLength: 16, requireLowercase: true, requireUppercase: true, requireDigits: true, requireSymbols: false },
       accountRecovery: cognito.AccountRecovery.NONE,
       deletionProtection: true,

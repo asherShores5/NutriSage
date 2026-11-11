@@ -3,9 +3,10 @@ import { currentUsername, listPasskeys, registerPasskey, signOut } from "../../a
 import { isGuest, leaveGuest } from "../../session";
 import { Library } from "../library/Library";
 import { MealWindowsCard } from "./MealWindowsCard";
+import { PasswordCard } from "./PasswordCard";
 import { ThemePicker } from "./ThemePicker";
 
-/** The Profile tab: who's signed in, Meal windows, the Library, theme, passkeys and sign out. */
+/** The Profile tab: who's signed in, Meal windows, the Library, theme, passkeys, password and sign out. */
 export function Profile() {
   const [library, setLibrary] = useState(false);
   if (library) return <Library onClose={() => setLibrary(false)} />;
@@ -18,6 +19,7 @@ export function Profile() {
       <LibraryCard onOpen={() => setLibrary(true)} />
       <ThemePicker />
       <Passkeys />
+      <PasswordCard />
       <button onClick={() => void signOut()}>Sign out</button>
     </div>
   );

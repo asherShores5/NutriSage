@@ -146,6 +146,18 @@ export async function registerPasskey() {
   localStorage.setItem(HAS_PASSKEY, "1");
 }
 
+/** Change the signed-in Member's password (Profile). A wrong current password reads plainly. */
+export async function changePassword(current: string, next: string) {
+  const accessToken = (await freshTokens()).accessToken;
+  try {
+    await cognito("ChangePassword", { AccessToken: accessToken, PreviousPassword: current, ProposedPassword: next });
+  } catch (e) {
+    if (e instanceof CognitoError && e.type === "NotAuthorizedException") throw new Error("Your current password is wrong.");
+    if (e instanceof CognitoError && e.type === "LimitExceededException") throw new Error("Too many tries. Wait a few minutes and try again.");
+    throw e;
+  }
+}
+
 /** Cognito's ListWebAuthnCredentials entry (CreatedAt in epoch seconds). */
 export interface Passkey {
   CredentialId: string;

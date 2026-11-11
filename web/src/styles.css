@@ -82,6 +82,8 @@ button.link { height: auto; padding: 0.35rem 0; border: 0; background: none; col
 .card { display: grid; gap: 0.6rem; justify-items: start; padding: 1rem; margin: 1rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .card h3 { margin: 0; font-size: 1.05rem; }
 .card p { margin: 0; }
+.password-form { display: grid; gap: 0.6rem; width: 100%; max-width: 22rem; }
+.password-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0;
