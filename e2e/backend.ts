@@ -79,6 +79,12 @@ export const resetGuestCaps = () => guest.reset();
 
 export const PASSWORD = "e2e-password";
 
+/** Each Member's current password (ChangePassword moves it). Starts at PASSWORD. */
+const passwords = new Map<string, string>();
+export const passwordOf = (username: string) => passwords.get(username) ?? PASSWORD;
+/** Put a Member's password back to PASSWORD, so later checks can sign in. */
+export const resetPassword = (username: string) => passwords.delete(username);
+
 const tokensFor = (username: string) => ({
   AuthenticationResult: {
     IdToken: `fake-id.${username}`, AccessToken: `fake-access.${username}`,
@@ -125,7 +131,7 @@ export function cognito(target: string, body: any): { status: number; json: unkn
         return { status: 200, json: { ChallengeName: "WEB_AUTHN", Session: session, ChallengeParameters: { CREDENTIAL_REQUEST_OPTIONS: JSON.stringify(options) } } };
       }
       // preventUserExistenceErrors: an unknown user looks like a wrong password.
-      if (!MEMBERS[u] || body.AuthParameters?.PASSWORD !== PASSWORD) return wrong();
+      if (!MEMBERS[u] || body.AuthParameters?.PASSWORD !== passwordOf(u)) return wrong();
       return { status: 200, json: tokensFor(u) };
     }
     case "RespondToAuthChallenge": {
@@ -162,6 +168,16 @@ export function cognito(target: string, body: any): { status: number; json: unkn
       const u = memberForAccess(body.AccessToken);
       if (!u) return fail("NotAuthorizedException", "Invalid Access Token");
       return { status: 200, json: { Credentials: passkeysOf(u).map((id, i) => ({ CredentialId: id, RelyingPartyId: RP_ID, CreatedAt: 1_800_000_000 + i })) } };
+    }
+    case "ChangePassword": {
+      const u = memberForAccess(body.AccessToken);
+      if (!u) return fail("NotAuthorizedException", "Invalid Access Token");
+      if (body.PreviousPassword !== passwordOf(u)) return wrong();
+      // The pool's policy (infra/lib/stacks.ts): 16+ characters, lower, upper and a digit.
+      const p = String(body.ProposedPassword ?? "");
+      if (p.length < 16 || !/[a-z]/.test(p) || !/[A-Z]/.test(p) || !/[0-9]/.test(p)) return fail("InvalidPasswordException", "Password does not conform to policy.");
+      passwords.set(u, p);
+      return { status: 200, json: {} };
     }
     case "RevokeToken":
       return { status: 200, json: {} };

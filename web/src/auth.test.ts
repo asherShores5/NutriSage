@@ -212,6 +212,32 @@ describe("adding a passkey", () => {
   });
 });
 
+describe("changing the password", () => {
+  it("sends the current and new password with the signed-in Member's access token", async () => {
+    const auth = await signedIn();
+    cognito.ChangePassword = [{ status: 200, body: {} }];
+    await auth.changePassword("a-long-password-here", "A new password 1234");
+    expect(calls.at(-1)).toEqual({
+      target: "ChangePassword",
+      body: { AccessToken: "access-1", PreviousPassword: "a-long-password-here", ProposedPassword: "A new password 1234" },
+    });
+    expect(auth.isSignedIn()).toBe(true);
+  });
+
+  it("a wrong current password reads plainly and keeps the Member signed in", async () => {
+    const auth = await signedIn();
+    cognito.ChangePassword = [{ status: 400, body: { __type: "NotAuthorizedException", message: "Incorrect username or password." } }];
+    await expect(auth.changePassword("nope", "A new password 1234")).rejects.toThrow("Your current password is wrong.");
+    expect(auth.isSignedIn()).toBe(true);
+  });
+
+  it("passes Cognito's policy message through", async () => {
+    const auth = await signedIn();
+    cognito.ChangePassword = [{ status: 400, body: { __type: "InvalidPasswordException", message: "Password does not conform to policy." } }];
+    await expect(auth.changePassword("a-long-password-here", "weak")).rejects.toThrow("Password does not conform to policy.");
+  });
+});
+
 describe("signing out", () => {
   it("revokes the refresh token and forgets this device's passkey flag, so the next Member isn't misled", async () => {
     const auth = await signedIn();
